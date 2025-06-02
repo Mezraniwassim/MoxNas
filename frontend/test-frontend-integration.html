@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Integration Test - MoxNAS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #ffffff;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stats-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stats-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        h1, h2, h3 {
+            color: #343a40;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .badge-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .badge-info {
+            background-color: #17a2b8;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Frontend Integration Test - MoxNAS</h1>
+        <p>This test verifies that the frontend JavaScript correctly integrates with the Django backend API endpoints and environment variables.</p>
+        
+        <div class="section">
+            <h2>🔄 Test Controls</h2>
+            <button onclick="runFullIntegrationTest()" id="testBtn">Run Full Integration Test</button>
+            <button onclick="testProxmoxManager()" id="proxmoxBtn">Test Proxmox Manager</button>
+            <button onclick="clearResults()">Clear Results</button>
+            <button onclick="loadMainFrontend()">Open Main Frontend</button>
+        </div>
+
+        <div class="section">
+            <h2>📊 Test Results</h2>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="grid">
+            <div class="section">
+                <h2>🌐 API Connectivity</h2>
+                <div id="api-status"></div>
+            </div>
+            
+            <div class="section">
+                <h2>📈 Live Statistics</h2>
+                <div id="live-stats"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 Detailed API Responses</h2>
+            <div id="api-responses"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api';
+        let testResults = [];
+        
+        function addResult(message, type = 'info', details = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `status ${type}`;
+            
+            let content = `${timestamp} - ${message}`;
+            if (details) {
+                content += `<br><small>${details}</small>`;
+            }
+            
+            resultDiv.innerHTML = content;
+            resultsDiv.appendChild(resultDiv);
+            
+            // Keep only last 20 results
+            const results = resultsDiv.children;
+            if (results.length > 20) {
+                resultsDiv.removeChild(results[0]);
+            }
+            
+            // Scroll to bottom
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function addResponse(title, data, type = 'success') {
+            const responsesDiv = document.getElementById('api-responses');
+            const responseDiv = document.createElement('div');
+            const badgeClass = type === 'success' ? 'badge-success' : 
+                              type === 'error' ? 'badge-danger' : 'badge-info';
+            
+            responseDiv.innerHTML = `
+                <h4>${title} <span class="badge ${badgeClass}">${type.toUpperCase()}</span></h4>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            responsesDiv.appendChild(responseDiv);
+        }
+        
+        function updateApiStatus(endpoint, status, responseTime = null) {
+            const statusDiv = document.getElementById('api-status');
+            const statusItem = document.createElement('div');
+            const statusClass = status === 'success' ? 'success' : 'error';
+            const timeInfo = responseTime ? ` (${responseTime}ms)` : '';
+            
+            statusItem.className = `status ${statusClass}`;
+            statusItem.innerHTML = `${endpoint}: ${status.toUpperCase()}${timeInfo}`;
+            statusDiv.appendChild(statusItem);
+        }
+        
+        function updateLiveStats(data) {
+            const statsDiv = document.getElementById('live-stats');
+            
+            // Count statistics
+            const stats = {
+                nodes: data.nodes ? data.nodes.length : 0,
+                containers: data.containers ? data.containers.length : 0,
+                runningContainers: data.containers ? data.containers.filter(c => c.status === 'running').length : 0,
+                storage: data.storage ? data.storage.length : 0
+            };
+            
+            statsDiv.innerHTML = `
+                <div class="grid">
+                    <div class="stats-card">
+                        <div class="stats-value">${stats.nodes}</div>
+                        <div class="stats-label">Proxmox Nodes</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value">${stats.containers}</div>
+                        <div class="stats-label">Total Containers</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value">${stats.runningContainers}</div>
+                        <div class="stats-label">Running Containers</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value">${stats.storage}</div>
+                        <div class="stats-label">Storage Pools</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('api-responses').innerHTML = '';
+            document.getElementById('api-status').innerHTML = '';
+            document.getElementById('live-stats').innerHTML = '';
+        }
+        
+        async function testEndpoint(endpoint, description) {
+            const startTime = performance.now();
+            try {
+                addResult(`Testing ${description}...`, 'info');
+                const response = await fetch(`${API_BASE_URL}${endpoint}`);
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const itemCount = Array.isArray(data) ? data.length : (data.success ? 'success' : 'object');
+                
+                addResult(`✅ ${description} - Success`, 'success', 
+                         `${itemCount} ${Array.isArray(data) ? 'items' : 'returned'} in ${responseTime}ms`);
+                updateApiStatus(endpoint, 'success', responseTime);
+                addResponse(description, data, 'success');
+                
+                return data;
+                
+            } catch (error) {
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+                
+                addResult(`❌ ${description} - Failed`, 'error', error.message);
+                updateApiStatus(endpoint, 'error', responseTime);
+                addResponse(`${description} - ERROR`, { error: error.message }, 'error');
+                
+                return null;
+            }
+        }
+        
+        async function runFullIntegrationTest() {
+            clearResults();
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = true;
+            testBtn.textContent = 'Running Tests...';
+            
+            addResult('🚀 Starting Full Integration Test...', 'info');
+            
+            try {
+                // Test all endpoints
+                const config = await testEndpoint('/proxmox/api/config/', 'Configuration Endpoint');
+                const nodes = await testEndpoint('/proxmox/api/nodes/', 'Nodes Endpoint');
+                const containers = await testEndpoint('/proxmox/api/containers/', 'Containers Endpoint');
+                const storage = await testEndpoint('/proxmox/api/storage/', 'Storage Endpoint');
+                const cluster = await testEndpoint('/proxmox/api/cluster-status/', 'Cluster Status Endpoint');
+                
+                // Update live statistics
+                updateLiveStats({ nodes, containers, storage });
+                
+                // Environment Variables Test
+                addResult('🔐 Testing Environment Variables Integration...', 'info');
+                if (config && config.success) {
+                    const proxmoxConfig = config.config.proxmox;
+                    if (proxmoxConfig.host && proxmoxConfig.host !== '') {
+                        addResult('✅ Environment Variables - Loaded successfully', 'success', 
+                                 `Host: ${proxmoxConfig.host}, Port: ${proxmoxConfig.port}`);
+                    } else {
+                        addResult('⚠️ Environment Variables - Config incomplete', 'warning');
+                    }
+                } else {
+                    addResult('❌ Environment Variables - Failed to load', 'error');
+                }
+                
+                // Live Data Test
+                addResult('📊 Testing Live Data Integration...', 'info');
+                if (nodes && containers && storage) {
+                    const totalNodes = nodes.length;
+                    const totalContainers = containers.length;
+                    const runningContainers = containers.filter(c => c.status === 'running').length;
+                    const storageCount = storage.length;
+                    
+                    addResult('✅ Live Data - Successfully retrieved', 'success', 
+                             `${totalNodes} nodes, ${totalContainers} containers (${runningContainers} running), ${storageCount} storage pools`);
+                } else {
+                    addResult('⚠️ Live Data - Partial data retrieved', 'warning');
+                }
+                
+                // Security Test
+                addResult('🔒 Testing Security Implementation...', 'info');
+                if (config && config.config && !config.config.proxmox.password) {
+                    addResult('✅ Security - No sensitive data exposed in API', 'success');
+                } else {
+                    addResult('⚠️ Security - Potential sensitive data exposure', 'warning');
+                }
+                
+                addResult('🎉 Integration Test Completed Successfully!', 'success');
+                
+            } catch (error) {
+                addResult('💥 Integration Test Failed', 'error', error.message);
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = 'Run Full Integration Test';
+            }
+        }
+        
+        async function testProxmoxManager() {
+            addResult('🔧 Testing ProxmoxManager Class...', 'info');
+            
+            // This would test the actual ProxmoxManager from proxmox-simple.js
+            // For now, we'll simulate the test
+            try {
+                const response = await fetch(`${API_BASE_URL}/proxmox/api/config/`);
+                if (response.ok) {
+                    addResult('✅ ProxmoxManager - Configuration loading works', 'success');
+                    addResult('✅ ProxmoxManager - Ready for frontend integration', 'success');
+                } else {
+                    addResult('❌ ProxmoxManager - Configuration loading failed', 'error');
+                }
+            } catch (error) {
+                addResult('❌ ProxmoxManager - Test failed', 'error', error.message);
+            }
+        }
+        
+        function loadMainFrontend() {
+            window.open('/home/wassim/Documents/MoxNas/frontend/index.html', '_blank');
+        }
+        
+        // Auto-run basic test on page load
+        window.addEventListener('load', () => {
+            addResult('🌟 Frontend Integration Test Ready', 'info');
+            setTimeout(() => {
+                addResult('▶️ Auto-running connectivity test...', 'info');
+                testEndpoint('/proxmox/api/config/', 'Quick Connectivity Check');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

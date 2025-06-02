@@ -1,5 +1,14 @@
 {
+    "python.defaultInterpreterPath": "/usr/bin/python3",
     "python.analysis.extraPaths": [
-        "./src"
-    ]
+        "./backend"
+    ],
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.autoImportCompletions": true,
+    "pylance.insidersChannel": "off",
+    "python.languageServer": "Pylance",
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true
+    }
 }
