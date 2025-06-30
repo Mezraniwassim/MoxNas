@@ -1,103 +1,107 @@
 #!/usr/bin/env python3
-"""Test Proxmox connection with the new configuration."""
+"""
+Test Proxmox Connection
+Verify that MoxNAS can connect to Proxmox with the provided credentials
+"""
 
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
+from decouple import config
 
-# Load environment variables first
-env_path = Path(__file__).parent / '.env'
-load_dotenv(env_path)
+# Add the backend directory to Python path
+backend_path = Path(__file__).parent / 'backend'
+sys.path.insert(0, str(backend_path))
 
-# Add the backend directory to the Python path
-backend_dir = Path(__file__).parent / "backend"
-sys.path.insert(0, str(backend_dir))
-
-# Import Django and configure it
-import django
-from django.conf import settings
-
-# Set up Django environment
+# Set Django settings
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'moxnas.settings')
+
+import django
 django.setup()
 
-from proxmoxer import ProxmoxAPI
-from proxmoxer.tools import Tasks
+from proxmox.proxmox_client import ProxmoxAPI
 
 def test_proxmox_connection():
-    """Test connection to Proxmox server."""
+    """Test connection to Proxmox using environment variables"""
+    print("🧪 Testing Proxmox Connection")
+    print("=" * 50)
+    
+    # Load configuration from .env
+    host = config('PROXMOX_HOST', default='')
+    port = config('PROXMOX_PORT', default=8006, cast=int)
+    username = config('PROXMOX_USERNAME', default='root')
+    password = config('PROXMOX_PASSWORD', default='')
+    realm = config('PROXMOX_REALM', default='pam')
+    ssl_verify = config('PROXMOX_SSL_VERIFY', default=False, cast=bool)
+    
+    print(f"🔧 Configuration:")
+    print(f"   Host: {host}")
+    print(f"   Port: {port}")
+    print(f"   Username: {username}@{realm}")
+    print(f"   SSL Verify: {ssl_verify}")
+    print()
+    
+    if not host or not password:
+        print("❌ Error: PROXMOX_HOST and PROXMOX_PASSWORD must be set in .env file")
+        return False
+    
     try:
-        print("=== Testing Proxmox Connection ===")
-        print(f"Host: {settings.PROXMOX_CONFIG['HOST']}")
-        print(f"User: {settings.PROXMOX_CONFIG['USER']}")
-        print(f"Port: {settings.PROXMOX_CONFIG['PORT']}")
-        print(f"SSL Verification: {settings.PROXMOX_CONFIG['VERIFY_SSL']}")
-        
-        # Create Proxmox API connection
-        proxmox = ProxmoxAPI(
-            settings.PROXMOX_CONFIG['HOST'],
-            user=settings.PROXMOX_CONFIG['USER'],
-            password=settings.PROXMOX_CONFIG['PASSWORD'],
-            verify_ssl=settings.PROXMOX_CONFIG['VERIFY_SSL'],
-            port=settings.PROXMOX_CONFIG['PORT']
+        # Create Proxmox API client
+        client = ProxmoxAPI(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            realm=realm,
+            ssl_verify=ssl_verify
         )
         
-        print("\n=== Connection successful! ===")
-        
-        # Test basic API calls
-        print("\n=== Getting cluster version ===")
-        version = proxmox.version.get()
-        print(f"Proxmox version: {version}")
-        
-        print("\n=== Getting nodes ===")
-        nodes = proxmox.nodes.get()
-        for node in nodes:
-            print(f"Node: {node['node']} - Status: {node['status']} - Type: {node['type']}")
+        print("🔐 Testing authentication...")
+        if client.authenticate():
+            print("✅ Authentication successful!")
             
-        print("\n=== Getting node resources ===")
-        if nodes:
-            first_node = nodes[0]['node']
-            resources = proxmox.nodes(first_node).get()
-            print(f"Node {first_node} details:")
-            print(f"  CPU: {resources.get('cpu', 'N/A')}")
-            print(f"  Memory: {resources.get('mem', 'N/A')} / {resources.get('maxmem', 'N/A')}")
-            print(f"  Disk: {resources.get('disk', 'N/A')} / {resources.get('maxdisk', 'N/A')}")
-            print(f"  Uptime: {resources.get('uptime', 'N/A')}")
+            # Test getting nodes
+            print("\n📡 Testing node listing...")
+            nodes = client.get_nodes()
+            print(f"✅ Found {len(nodes)} Proxmox nodes:")
+            for node in nodes:
+                print(f"   - {node.get('node', 'Unknown')} (Status: {node.get('status', 'Unknown')})")
             
-            print(f"\n=== Getting containers on {first_node} ===")
-            try:
-                containers = proxmox.nodes(first_node).lxc.get()
-                if containers:
-                    for container in containers:
-                        print(f"Container {container['vmid']}: {container.get('name', 'Unnamed')} - Status: {container['status']}")
-                else:
-                    print("No containers found")
-            except Exception as e:
-                print(f"Error getting containers: {e}")
-                
-            print(f"\n=== Getting VMs on {first_node} ===")
-            try:
-                vms = proxmox.nodes(first_node).qemu.get()
-                if vms:
-                    for vm in vms:
-                        print(f"VM {vm['vmid']}: {vm.get('name', 'Unnamed')} - Status: {vm['status']}")
-                else:
-                    print("No VMs found")
-            except Exception as e:
-                print(f"Error getting VMs: {e}")
-        
-        return True
-        
+            # Test getting containers
+            print("\n📦 Testing container listing...")
+            containers = client.get_containers()
+            print(f"✅ Found {len(containers)} LXC containers:")
+            for container in containers[:5]:  # Show first 5
+                vmid = container.get('vmid', 'Unknown')
+                name = container.get('name', 'Unnamed')
+                status = container.get('status', 'Unknown')
+                print(f"   - CT{vmid}: {name} ({status})")
+            
+            if len(containers) > 5:
+                print(f"   ... and {len(containers) - 5} more containers")
+            
+            print("\n🎉 Proxmox connection test successful!")
+            print("\n💡 You can now:")
+            print("   1. Start MoxNAS: python3 start_moxnas.py")
+            print("   2. Access web interface: http://localhost:8080")
+            print("   3. Go to Proxmox tab to manage containers")
+            
+            return True
+            
+        else:
+            print("❌ Authentication failed!")
+            print("   Check your username and password in .env file")
+            return False
+            
     except Exception as e:
-        print(f"\n=== Connection failed ===")
-        print(f"Error: {e}")
+        print(f"❌ Connection failed: {str(e)}")
+        print("\n🔧 Troubleshooting:")
+        print("   1. Check if Proxmox host is reachable")
+        print("   2. Verify credentials in .env file")
+        print("   3. Check if Proxmox web interface is accessible")
+        print(f"   4. Try: https://{host}:{port}")
         return False
 
 if __name__ == "__main__":
     success = test_proxmox_connection()
-    if success:
-        print("\n✅ Proxmox connection test passed!")
-    else:
-        print("\n❌ Proxmox connection test failed!")
-        sys.exit(1)
+    sys.exit(0 if success else 1)

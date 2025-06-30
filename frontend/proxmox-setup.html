@@ -1,0 +1,631 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoxNAS - Proxmox Setup</title>
+    <link rel="stylesheet" href="src/styles/truenas-theme.css">
+    <link rel="stylesheet" href="src/styles/truenas-components.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <style>
+        .setup-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .setup-wizard {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .setup-form {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef5350 0%, #f44336 100%);
+            color: white;
+        }
+        
+        .connection-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        .status-success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .status-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .hosts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .host-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border: 2px solid #e1e5e9;
+            transition: all 0.3s ease;
+        }
+        
+        .host-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .host-card.connected {
+            border-color: #38ef7d;
+            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+        }
+        
+        .host-card.disconnected {
+            border-color: #f44336;
+            background: linear-gradient(135deg, #fff8f8 0%, #f5e8e8 100%);
+        }
+        
+        .host-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .host-name {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .host-status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-online {
+            background: #38ef7d;
+            color: white;
+        }
+        
+        .status-offline {
+            background: #f44336;
+            color: white;
+        }
+        
+        .host-details {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .host-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .host-actions .btn {
+            flex: 1;
+            text-align: center;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        
+        .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e1e5e9;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            color: #666;
+        }
+        
+        .step.active {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .step.completed {
+            color: #38ef7d;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <!-- Header -->
+        <div class="setup-wizard">
+            <h1><i class="fas fa-server"></i> Proxmox Setup</h1>
+            <p>Configure and manage your Proxmox Virtual Environment hosts</p>
+            
+            <div class="step-indicator">
+                <div class="step active" id="step-1">
+                    <i class="fas fa-plus-circle"></i><br>
+                    Add Host
+                </div>
+                <div class="step" id="step-2">
+                    <i class="fas fa-wifi"></i><br>
+                    Test Connection
+                </div>
+                <div class="step" id="step-3">
+                    <i class="fas fa-sync"></i><br>
+                    Sync Data
+                </div>
+                <div class="step" id="step-4">
+                    <i class="fas fa-check-circle"></i><br>
+                    Complete
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Host Form -->
+        <div class="setup-form" id="add-host-form">
+            <h2><i class="fas fa-plus"></i> Add New Proxmox Host</h2>
+            <form id="proxmox-form">
+                <div class="form-group">
+                    <label for="host-name">Host Name (Display Name)</label>
+                    <input type="text" id="host-name" name="name" placeholder="e.g., Main Proxmox Server" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="host-ip">Host IP Address or Hostname</label>
+                    <input type="text" id="host-ip" name="host" placeholder="e.g., 172.16.135.128" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="host-port">Port</label>
+                    <input type="number" id="host-port" name="port" value="8006" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="host-user">Username</label>
+                    <input type="text" id="host-user" name="user" value="root@pam" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="host-password">Password</label>
+                    <input type="password" id="host-password" name="password" placeholder="Enter password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="verify-ssl" name="verify_ssl"> Verify SSL Certificate
+                    </label>
+                </div>
+                
+                <div class="connection-status" id="connection-status"></div>
+                
+                <button type="button" class="btn btn-warning" id="test-connection">
+                    <i class="fas fa-wifi"></i> Test Connection
+                </button>
+                <button type="submit" class="btn btn-primary" id="add-host" disabled>
+                    <i class="fas fa-plus"></i> Add Host
+                </button>
+            </form>
+        </div>
+
+        <!-- Existing Hosts -->
+        <div class="setup-form">
+            <h2><i class="fas fa-list"></i> Configured Proxmox Hosts</h2>
+            <button class="btn btn-primary" id="refresh-hosts">
+                <i class="fas fa-refresh"></i> Refresh
+            </button>
+            <div class="hosts-grid" id="hosts-grid">
+                <!-- Hosts will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ProxmoxSetup {
+            constructor() {
+                this.apiBase = 'http://localhost:8000/api/proxmox/api';
+                this.currentStep = 1;
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.loadExistingHosts();
+                
+                // Pre-fill form if this is the first setup
+                this.checkFirstSetup();
+            }
+
+            setupEventListeners() {
+                document.getElementById('test-connection').addEventListener('click', () => this.testConnection());
+                document.getElementById('proxmox-form').addEventListener('submit', (e) => this.addHost(e));
+                document.getElementById('refresh-hosts').addEventListener('click', () => this.loadExistingHosts());
+            }
+
+            async checkFirstSetup() {
+                try {
+                    const response = await fetch(`${this.apiBase}/config/`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.config.proxmox.host) {
+                        // Pre-fill with existing config
+                        document.getElementById('host-ip').value = data.config.proxmox.host;
+                        document.getElementById('host-port').value = data.config.proxmox.port;
+                        document.getElementById('host-user').value = data.config.proxmox.user;
+                        document.getElementById('verify-ssl').checked = data.config.proxmox.verify_ssl;
+                        
+                        if (!document.getElementById('host-name').value) {
+                            document.getElementById('host-name').value = `Proxmox ${data.config.proxmox.host}`;
+                        }
+                    }
+                } catch (error) {
+                    console.log('No existing config found, starting fresh setup');
+                }
+            }
+
+            async testConnection() {
+                const form = document.getElementById('proxmox-form');
+                const formData = new FormData(form);
+                const statusDiv = document.getElementById('connection-status');
+                const testBtn = document.getElementById('test-connection');
+                
+                testBtn.innerHTML = '<i class="fas fa-spinner loading"></i> Testing...';
+                testBtn.disabled = true;
+                
+                try {
+                    const testData = {
+                        host: formData.get('host'),
+                        port: parseInt(formData.get('port')),
+                        user: formData.get('user'),
+                        password: formData.get('password'),
+                        verify_ssl: formData.get('verify_ssl') === 'on'
+                    };
+
+                    const response = await fetch(`${this.apiBase}/connect/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(testData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showStatus('success', `✅ Connection successful! Connected to Proxmox VE ${result.version || 'Unknown'}`);
+                        document.getElementById('add-host').disabled = false;
+                        this.updateStep(2);
+                    } else {
+                        this.showStatus('error', `❌ Connection failed: ${result.error}`);
+                        document.getElementById('add-host').disabled = true;
+                    }
+                } catch (error) {
+                    this.showStatus('error', `❌ Connection error: ${error.message}`);
+                    document.getElementById('add-host').disabled = true;
+                } finally {
+                    testBtn.innerHTML = '<i class="fas fa-wifi"></i> Test Connection';
+                    testBtn.disabled = false;
+                }
+            }
+
+            async addHost(event) {
+                event.preventDefault();
+                
+                const form = document.getElementById('proxmox-form');
+                const formData = new FormData(form);
+                const addBtn = document.getElementById('add-host');
+                
+                addBtn.innerHTML = '<i class="fas fa-spinner loading"></i> Adding...';
+                addBtn.disabled = true;
+                
+                try {
+                    const hostData = {
+                        name: formData.get('name'),
+                        host: formData.get('host'),
+                        port: parseInt(formData.get('port')),
+                        user: formData.get('user'),
+                        password: formData.get('password'),
+                        verify_ssl: formData.get('verify_ssl') === 'on'
+                    };
+
+                    const response = await fetch(`${this.apiBase}/hosts/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(hostData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        this.showStatus('success', '✅ Host added successfully!');
+                        this.updateStep(3);
+                        
+                        // Sync data
+                        await this.syncData();
+                        
+                        // Refresh hosts list
+                        await this.loadExistingHosts();
+                        
+                        // Reset form
+                        form.reset();
+                        document.getElementById('add-host').disabled = true;
+                        
+                        this.updateStep(4);
+                    } else {
+                        this.showStatus('error', `❌ Failed to add host: ${result.error || 'Unknown error'}`);
+                    }
+                } catch (error) {
+                    this.showStatus('error', `❌ Error adding host: ${error.message}`);
+                } finally {
+                    addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Host';
+                    addBtn.disabled = false;
+                }
+            }
+
+            async syncData() {
+                try {
+                    this.showStatus('warning', '🔄 Syncing Proxmox data...');
+                    
+                    const response = await fetch(`${this.apiBase}/sync/`, {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showStatus('success', '✅ Data synced successfully!');
+                    } else {
+                        this.showStatus('warning', `⚠️ Sync completed with warnings: ${result.message}`);
+                    }
+                } catch (error) {
+                    this.showStatus('error', `❌ Sync failed: ${error.message}`);
+                }
+            }
+
+            async loadExistingHosts() {
+                try {
+                    const response = await fetch(`${this.apiBase}/hosts/`);
+                    const hosts = await response.json();
+                    
+                    this.displayHosts(hosts);
+                } catch (error) {
+                    console.error('Failed to load hosts:', error);
+                }
+            }
+
+            displayHosts(hosts) {
+                const grid = document.getElementById('hosts-grid');
+                
+                if (!hosts || hosts.length === 0) {
+                    grid.innerHTML = '<p style="text-align: center; color: #666; grid-column: 1/-1;">No Proxmox hosts configured yet.</p>';
+                    return;
+                }
+
+                grid.innerHTML = hosts.map(host => `
+                    <div class="host-card ${host.is_connected ? 'connected' : 'disconnected'}">
+                        <div class="host-header">
+                            <div class="host-name">${host.name}</div>
+                            <div class="host-status ${host.is_connected ? 'status-online' : 'status-offline'}">
+                                ${host.is_connected ? 'Online' : 'Offline'}
+                            </div>
+                        </div>
+                        <div class="host-details">
+                            <div><strong>Host:</strong> ${host.host}:${host.port}</div>
+                            <div><strong>User:</strong> ${host.user}</div>
+                            <div><strong>SSL:</strong> ${host.verify_ssl ? 'Enabled' : 'Disabled'}</div>
+                            ${host.last_connected ? `<div><strong>Last Connected:</strong> ${new Date(host.last_connected).toLocaleString()}</div>` : ''}
+                        </div>
+                        <div class="host-actions">
+                            <button class="btn btn-success" onclick="proxmoxSetup.connectHost(${host.id})">
+                                <i class="fas fa-plug"></i> Connect
+                            </button>
+                            <button class="btn btn-primary" onclick="proxmoxSetup.editHost(${host.id})">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="btn btn-danger" onclick="proxmoxSetup.deleteHost(${host.id})">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            async connectHost(hostId) {
+                try {
+                    const response = await fetch(`${this.apiBase}/hosts/${hostId}/connect/`, {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showStatus('success', '✅ Host connected successfully!');
+                        this.loadExistingHosts();
+                    } else {
+                        this.showStatus('error', `❌ Connection failed: ${result.error}`);
+                    }
+                } catch (error) {
+                    this.showStatus('error', `❌ Connection error: ${error.message}`);
+                }
+            }
+
+            async deleteHost(hostId) {
+                if (!confirm('Are you sure you want to delete this Proxmox host?')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${this.apiBase}/hosts/${hostId}/`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        this.showStatus('success', '✅ Host deleted successfully!');
+                        this.loadExistingHosts();
+                    } else {
+                        this.showStatus('error', '❌ Failed to delete host');
+                    }
+                } catch (error) {
+                    this.showStatus('error', `❌ Delete error: ${error.message}`);
+                }
+            }
+
+            editHost(hostId) {
+                // For now, just show a message. We could implement inline editing later
+                alert(`Edit functionality for host ${hostId} will be implemented soon. For now, you can delete and re-add the host.`);
+            }
+
+            showStatus(type, message) {
+                const statusDiv = document.getElementById('connection-status');
+                statusDiv.className = `connection-status status-${type}`;
+                statusDiv.innerHTML = message;
+                statusDiv.style.display = 'block';
+                
+                // Auto-hide success messages after 5 seconds
+                if (type === 'success') {
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 5000);
+                }
+            }
+
+            updateStep(step) {
+                // Remove active class from all steps
+                document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+                
+                // Mark completed steps
+                for (let i = 1; i < step; i++) {
+                    const stepEl = document.getElementById(`step-${i}`);
+                    if (stepEl) {
+                        stepEl.classList.add('completed');
+                    }
+                }
+                
+                // Mark current step as active
+                const currentStepEl = document.getElementById(`step-${step}`);
+                if (currentStepEl) {
+                    currentStepEl.classList.add('active');
+                }
+                
+                this.currentStep = step;
+            }
+        }
+
+        // Initialize the setup when page loads
+        const proxmoxSetup = new ProxmoxSetup();
+    </script>
+</body>
+</html>

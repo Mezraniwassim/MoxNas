@@ -5,6 +5,7 @@ Django views for Proxmox integration
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
@@ -78,6 +79,118 @@ class ProxmoxHostViewSet(viewsets.ModelViewSet):
             } for host in hosts
         ]
         return Response(data)
+    
+    def create(self, request):
+        """Create a new Proxmox host"""
+        try:
+            data = request.data
+            
+            # Extract password but don't store it in the model
+            password = data.get('password', '')
+            
+            # Create the host record
+            host = ProxmoxHost.objects.create(
+                name=data.get('name', ''),
+                host=data.get('host', ''),
+                port=data.get('port', 8006),
+                user=data.get('user', 'root@pam'),
+                verify_ssl=data.get('verify_ssl', False),
+                is_active=True
+            )
+            
+            # Test connection immediately after creation
+            from .manager import test_proxmox_connection
+            success, message = test_proxmox_connection(
+                host=host.host,
+                user=host.user,
+                password=password,
+                port=host.port,
+                verify_ssl=host.verify_ssl
+            )
+            
+            if success:
+                host.is_connected = True
+                host.last_connected = timezone.now()
+                host.save()
+                
+                # Store password securely for this session
+                # Note: In production, consider using encrypted storage
+                from django.core.cache import cache
+                cache.set(f'proxmox_password_{host.id}', password, 3600)  # 1 hour
+                
+                return Response({
+                    'id': host.id,
+                    'name': host.name,
+                    'host': host.host,
+                    'port': host.port,
+                    'user': host.user,
+                    'verify_ssl': host.verify_ssl,
+                    'is_active': host.is_active,
+                    'is_connected': host.is_connected,
+                    'last_connected': host.last_connected.isoformat() if host.last_connected else None,
+                }, status=status.HTTP_201_CREATED)
+            else:
+                host.delete()  # Remove if connection failed
+                return Response({
+                    'error': f'Failed to connect to Proxmox host: {message}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Failed to create Proxmox host: {str(e)}")
+            return Response({
+                'error': f'Failed to create host: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def connect(self, request, pk=None):
+        """Test and establish connection to a Proxmox host"""
+        try:
+            host = self.get_object()
+            password = request.data.get('password', '')
+            
+            # Try to get password from cache if not provided
+            if not password:
+                from django.core.cache import cache
+                password = cache.get(f'proxmox_password_{host.id}', '')
+            
+            if not password:
+                return Response({
+                    'error': 'Password required for connection'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            from .manager import test_proxmox_connection
+            success, message = test_proxmox_connection(
+                host=host.host,
+                user=host.user,
+                password=password,
+                port=host.port,
+                verify_ssl=host.verify_ssl
+            )
+            
+            if success:
+                host.is_connected = True
+                host.last_connected = timezone.now()
+                host.save()
+                
+                return Response({
+                    'success': True,
+                    'message': f'Successfully connected to {host.name}',
+                    'version': message  # test_proxmox_connection returns version info on success
+                })
+            else:
+                host.is_connected = False
+                host.save()
+                return Response({
+                    'success': False,
+                    'error': message
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Failed to connect to Proxmox host {pk}: {str(e)}")
+            return Response({
+                'success': False,
+                'error': f'Connection failed: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @method_decorator(csrf_exempt, name='dispatch')

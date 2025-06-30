@@ -313,7 +313,7 @@ start_services() {
 show_info() {
     log_info "Getting container information..."
     
-    CONTAINER_IP=\$(pct exec "\$CONTAINER_ID" -- hostname -I | awk '{print \$1}')
+    CONTAINER_IP=$(pct exec "$CONTAINER_ID" -- hostname -I | awk '{print $1}')
     
     echo ""
     echo "=========================================="

@@ -1,18 +1,15 @@
-# MoxNAS Backend Requirements
+# Django Backend Dependencies
 Django==4.2.7
 djangorestframework==3.14.0
 django-cors-headers==4.3.1
-celery==5.3.4
-redis==5.0.1
-psutil==5.9.6
-paramiko==3.3.1
+psutil==5.9.5
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# System monitoring and utilities
 requests==2.31.0
-pyyaml==6.0.1
-python-dotenv==1.0.0
-proxmoxer==2.0.1
+python-decouple==3.8
+urllib3==2.0.7
 
 # Development dependencies
-pytest==7.4.3
-pytest-django==4.7.0
-black==23.11.0
-flake8==6.1.0
+django-extensions==3.2.3

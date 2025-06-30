@@ -325,3 +325,40 @@ def initialize_proxmox_connection(host: str, user: str, password: str,
         proxmox_manager = None
         
     return success
+
+
+def test_proxmox_connection(host: str, user: str, password: str, 
+                          port: int = 8006, verify_ssl: bool = False) -> tuple[bool, str]:
+    """
+    Test connection to Proxmox without storing the connection globally
+    
+    Args:
+        host: Proxmox host
+        user: Username
+        password: Password
+        port: API port
+        verify_ssl: SSL verification
+        
+    Returns:
+        tuple: (success: bool, message: str) - message contains version info on success or error on failure
+    """
+    try:
+        # Create temporary ProxmoxAPI connection
+        api = ProxmoxAPI(
+            host=host,
+            user=user,
+            password=password,
+            verify_ssl=verify_ssl,
+            port=port
+        )
+        
+        # Test connection by getting version
+        version = api.version.get()
+        version_str = version.get('version', 'Unknown')
+        
+        logger.info(f"Successfully tested connection to Proxmox VE {version_str} at {host}")
+        return True, version_str
+        
+    except Exception as e:
+        logger.error(f"Failed to test connection to Proxmox at {host}: {e}")
+        return False, str(e)
