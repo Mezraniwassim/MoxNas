@@ -1,0 +1,489 @@
+/* MoxNAS Theme - Inspired by TrueNAS */
+
+:root {
+  /* Primary Colors */
+  --primary-blue: #0ea5e9;
+  --primary-blue-dark: #0284c7;
+  --primary-blue-light: #7dd3fc;
+  
+  /* Background Colors */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-dark: #1e293b;
+  --bg-dark-secondary: #334155;
+  
+  /* Text Colors */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-white: #ffffff;
+  
+  /* Border Colors */
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --border-dark: #475569;
+  
+  /* Status Colors */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: --primary-blue;
+  
+  /* Card Colors */
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  
+  /* Sidebar */
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #cbd5e1;
+  --sidebar-hover: #334155;
+  --sidebar-active: var(--primary-blue);
+  
+  /* Navigation */
+  --nav-height: 60px;
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 60px;
+  
+  /* Typography */
+  --font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  --font-mono: 'SFMono-Regular', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-xxl: 3rem;
+  
+  /* Border Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+  }
+}
+
+/* Global Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-primary);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* Layout Components */
+.moxnas-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.moxnas-sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  position: fixed;
+  height: 100vh;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  overflow-y: auto;
+  transition: all 0.3s ease;
+}
+
+.moxnas-sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+.moxnas-main {
+  margin-left: var(--sidebar-width);
+  flex: 1;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  transition: margin-left 0.3s ease;
+}
+
+.moxnas-main.sidebar-collapsed {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+/* Top Navigation */
+.moxnas-topnav {
+  height: var(--nav-height);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: between;
+  padding: 0 var(--spacing-lg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.moxnas-topnav-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.moxnas-topnav-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+/* Content Area */
+.moxnas-content {
+  padding: var(--spacing-lg);
+}
+
+/* Card Components */
+.moxnas-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.moxnas-card-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--card-border);
+  background-color: var(--bg-tertiary);
+}
+
+.moxnas-card-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.moxnas-card-body {
+  padding: var(--spacing-lg);
+}
+
+/* Sidebar Navigation */
+.moxnas-nav {
+  padding: var(--spacing-md) 0;
+}
+
+.moxnas-nav-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.moxnas-nav-section-title {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-sm);
+}
+
+.moxnas-nav-item {
+  display: block;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.moxnas-nav-item:hover {
+  background-color: var(--sidebar-hover);
+  color: var(--text-white);
+  text-decoration: none;
+}
+
+.moxnas-nav-item.active {
+  background-color: var(--sidebar-hover);
+  color: var(--text-white);
+  border-left-color: var(--sidebar-active);
+}
+
+.moxnas-nav-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: var(--spacing-sm);
+  vertical-align: middle;
+}
+
+/* Buttons */
+.moxnas-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  gap: var(--spacing-xs);
+}
+
+.moxnas-btn-primary {
+  background-color: var(--primary-blue);
+  color: var(--text-white);
+  border-color: var(--primary-blue);
+}
+
+.moxnas-btn-primary:hover {
+  background-color: var(--primary-blue-dark);
+  border-color: var(--primary-blue-dark);
+}
+
+.moxnas-btn-secondary {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-medium);
+}
+
+.moxnas-btn-secondary:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.moxnas-btn-success {
+  background-color: var(--success);
+  color: var(--text-white);
+  border-color: var(--success);
+}
+
+.moxnas-btn-warning {
+  background-color: var(--warning);
+  color: var(--text-white);
+  border-color: var(--warning);
+}
+
+.moxnas-btn-danger {
+  background-color: var(--error);
+  color: var(--text-white);
+  border-color: var(--error);
+}
+
+/* Status Indicators */
+.moxnas-status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  gap: var(--spacing-xs);
+}
+
+.moxnas-status-success {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.moxnas-status-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.moxnas-status-error {
+  background-color: #fecaca;
+  color: #991b1b;
+}
+
+.moxnas-status-info {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+/* Grid Layout */
+.moxnas-grid {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.moxnas-grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.moxnas-grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.moxnas-grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.moxnas-grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 768px) {
+  .moxnas-grid-cols-2,
+  .moxnas-grid-cols-3,
+  .moxnas-grid-cols-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Stats Cards */
+.moxnas-stats-card {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+  color: var(--text-white);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.moxnas-stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transform: translate(30px, -30px);
+}
+
+.moxnas-stats-value {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-xs);
+}
+
+.moxnas-stats-label {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin-bottom: 0;
+}
+
+/* Tables */
+.moxnas-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--card-bg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.moxnas-table th,
+.moxnas-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.moxnas-table th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.moxnas-table tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Forms */
+.moxnas-form-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.moxnas-label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.moxnas-input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.moxnas-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .moxnas-sidebar {
+    transform: translateX(-100%);
+  }
+  
+  .moxnas-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  
+  .moxnas-main {
+    margin-left: 0;
+  }
+}
+
+/* Loading Spinner */
+.moxnas-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-light);
+  border-radius: 50%;
+  border-top-color: var(--primary-blue);
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Progress Bars */
+.moxnas-progress {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.moxnas-progress-bar {
+  height: 100%;
+  background-color: var(--primary-blue);
+  transition: width 0.3s ease;
+}
+
+.moxnas-progress-bar.success {
+  background-color: var(--success);
+}
+
+.moxnas-progress-bar.warning {
+  background-color: var(--warning);
+}
+
+.moxnas-progress-bar.danger {
+  background-color: var(--error);
+}
