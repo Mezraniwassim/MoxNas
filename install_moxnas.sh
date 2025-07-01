@@ -17,7 +17,7 @@ CONTAINER_HOSTNAME="moxnas"
 CONTAINER_PASSWORD="moxnas123"
 TEMPLATE="ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
 TEMPLATE_SIMPLE="ubuntu-22.04-standard"
-DISK_SIZE="8G"
+DISK_SIZE="8"
 MEMORY="2048"
 CORES="2"
 REPO_URL="https://github.com/Mezraniwassim/MoxNas.git"
@@ -198,6 +198,7 @@ create_container() {
     log_info "Template file: $TEMPLATE"
     log_info "Storage: $STORAGE_NAME"
     log_info "Full command: pct create $CONTAINER_ID local:vztmpl/$TEMPLATE --rootfs $STORAGE_NAME:$DISK_SIZE"
+    log_info "Note: Using Proxmox syntax $STORAGE_NAME:$DISK_SIZE (means ${DISK_SIZE}GB on $STORAGE_NAME storage)"
     
     # Create container with error handling
     if ! pct create "$CONTAINER_ID" \
