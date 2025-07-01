@@ -90,11 +90,18 @@ detect_storage() {
             # Don't skip, just warn - LVM thin pools can expand
         fi
         
-        # Prefer LVM-thin or directory storage for containers
-        if [[ "$storage_type" == "lvmthin" ]] || [[ "$storage_type" == "dir" ]]; then
+        # Prefer LVM-thin first, then other types that support containers
+        # Note: 'local' dir storage doesn't support container rootfs, only templates
+        if [[ "$storage_type" == "lvmthin" ]]; then
             STORAGE_NAME="$storage_name"
             log_info "Found suitable storage: $storage_name (type: $storage_type, available: ${storage_avail}KB)"
             break
+        elif [[ "$storage_type" == "lvm" ]] || [[ "$storage_type" == "zfspool" ]]; then
+            # These also support containers, use as backup if no lvmthin found
+            if [ -z "$STORAGE_NAME" ]; then
+                STORAGE_NAME="$storage_name"
+                log_info "Found suitable storage: $storage_name (type: $storage_type, available: ${storage_avail}KB)"
+            fi
         fi
     done < <(pvesm status)
     

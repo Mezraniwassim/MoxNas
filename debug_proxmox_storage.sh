@@ -148,7 +148,7 @@ else
     echo "  --password moxnas123 \\"
     echo "  --cores 2 \\"
     echo "  --memory 2048 \\"
-    echo "  --rootfs $RECOMMENDED_STORAGE:8G \\"
+    echo "  --rootfs $RECOMMENDED_STORAGE:8 \\"
     echo "  --net0 name=eth0,bridge=vmbr0,ip=dhcp \\"
     echo "  --features nesting=1 \\"
     echo "  --unprivileged 0 \\"

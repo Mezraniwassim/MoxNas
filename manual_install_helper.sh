@@ -70,13 +70,22 @@ while IFS= read -r line; do
     echo "  Content types: $content"
     
     if echo "$content" | grep -q "images\|rootdir"; then
-        if [[ "$storage_type" == "lvmthin" ]] || [[ "$storage_type" == "dir" ]]; then
+        if [[ "$storage_type" == "lvmthin" ]]; then
             if [ -z "$BEST_STORAGE" ]; then
                 BEST_STORAGE="$storage_name"
-                log_success "  ✅ RECOMMENDED for containers"
+                log_success "  ✅ RECOMMENDED for containers (LVM-thin)"
+            else
+                log_success "  ✅ Also suitable for containers (LVM-thin)"
+            fi
+        elif [[ "$storage_type" == "lvm" ]] || [[ "$storage_type" == "zfspool" ]]; then
+            if [ -z "$BEST_STORAGE" ]; then
+                BEST_STORAGE="$storage_name"
+                log_success "  ✅ SUITABLE for containers"
             else
                 log_success "  ✅ Also suitable for containers"
             fi
+        elif [[ "$storage_type" == "dir" ]]; then
+            log_warning "  ⚠️  Directory storage - only supports templates, not container rootfs"
         else
             log_info "  ⚠️  Supports containers but not optimal type"
         fi
@@ -110,7 +119,7 @@ if [ -n "$BEST_STORAGE" ]; then
     echo "  --password moxnas123 \\"
     echo "  --cores 2 \\"
     echo "  --memory 2048 \\"
-    echo "  --rootfs $BEST_STORAGE:8G \\"
+    echo "  --rootfs $BEST_STORAGE:8 \\"
     echo "  --net0 name=eth0,bridge=vmbr0,ip=dhcp \\"
     echo "  --features nesting=1 \\"
     echo "  --unprivileged 0 \\"
