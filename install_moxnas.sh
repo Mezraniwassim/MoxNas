@@ -84,9 +84,10 @@ detect_storage() {
         fi
         
         # Check available space (need at least 8GB = 8388608 KB)
-        if [[ "$storage_avail" =~ ^[0-9]+$ ]] && [ "$storage_avail" -lt 8388608 ]; then
-            log_warning "Storage $storage_name has insufficient space: ${storage_avail}KB available"
-            continue
+        # Note: We'll be more lenient with space check since LVM thin provisioning may show lower available space
+        if [[ "$storage_avail" =~ ^[0-9]+$ ]] && [ "$storage_avail" -lt 1048576 ]; then
+            log_warning "Storage $storage_name has very low space: ${storage_avail}KB available"
+            # Don't skip, just warn - LVM thin pools can expand
         fi
         
         # Prefer LVM-thin or directory storage for containers
@@ -177,8 +178,9 @@ download_template() {
         fi
     fi
     
-    # Get the actual template filename (just the filename, not the full path)
-    TEMPLATE=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}' | sed 's/.*://')
+    # Get the actual template filename (just the filename, without local:vztmpl/ prefix)
+    TEMPLATE_FULL=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}')
+    TEMPLATE=$(echo "$TEMPLATE_FULL" | sed 's/local:vztmpl\///')
     
     if [ -z "$TEMPLATE" ]; then
         log_error "Could not find Ubuntu 22.04 template after download"
