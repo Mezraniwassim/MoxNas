@@ -20,8 +20,8 @@ const Storage = () => {
         storageAPI.getMountPoints()
       ]);
       
-      setDatasets(datasetsResponse.data);
-      setMountPoints(mountsResponse.data);
+      setDatasets(datasetsResponse.data?.results || datasetsResponse.data || []);
+      setMountPoints(mountsResponse.data?.results || mountsResponse.data || []);
       setLoading(false);
     } catch (error) {
       console.error('Error loading storage data:', error);

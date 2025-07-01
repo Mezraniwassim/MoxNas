@@ -5,11 +5,14 @@ MoxNAS is a complete containerized NAS solution that runs entirely within LXC co
 ## Overview
 
 MoxNAS provides TrueNAS-like functionality in a lightweight LXC container:
+
 - **Complete NAS Services**: SMB, NFS, FTP, SSH, SNMP, iSCSI
 - **Modern Web Interface**: Django REST API + React frontend  
 - **Cloud Sync & Rsync**: Automated backup and synchronization
 - **User Management**: ACLs, groups, and service access control
 - **Self-Contained**: No external dependencies or development environment needed
+
+
 
 ## Quick Installation
 

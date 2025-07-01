@@ -3,40 +3,50 @@
 ## Issues Identified & Fixed
 
 ### 1. ✅ LXC Container Deployment
+
 **Problem:** Client couldn't run MoxNAS inside LXC container as specified
-**Solution:** 
+**Solution:**
+
 - Modified `start_moxnas.py` to run on port 8080 (client's expected port)
 - Created `start_container.sh` for proper LXC container startup
 - Updated systemd service to work inside containers
 - Removed Proxmox API dependency for core NAS functionality
 
 ### 2. ✅ One-Line Installation Script  
+
 **Problem:** Client wanted simple deployment
 **Solution:**
+
 - Enhanced `install_moxnas.sh` with better error handling
 - Added automatic service startup and verification
 - Created `verify_installation.sh` for deployment testing
 - Added `test_container.py` for functionality verification
 
 ### 3. ✅ Missing Credentials Tab
+
 **Problem:** Credentials tab was incomplete - major milestone 3 issue
 **Solution:**
+
 - Implemented full user management system in `backend/users/`
 - Added `MoxNASUser`, `MoxNASGroup`, and `AccessControlList` models
 - Created complete API endpoints for user/group/ACL management
 - Built fully functional React credentials interface with tabs for Users, Groups, and ACLs
 
 ### 4. ✅ Missing ACL Functionality
+
 **Problem:** Access Control Lists were not implemented
 **Solution:**
+
 - Added ACL models with filesystem integration
 - Implemented `setfacl` and `getfacl` system integration
 - Created ACL management interface in React
 - Added path-based permission management
 
 ### 5. ✅ Deployment Architecture Clarity
+
 **Problem:** Confusion about where MoxNAS runs (local vs container)
 **Solution:**
+
 - Clear documentation in `DEPLOYMENT.md`
 - MoxNAS now runs completely inside LXC container
 - Web interface accessible at `http://[container-ip]:8080`
@@ -44,7 +54,8 @@
 
 ## Deployment Now Works As Expected
 
-### For Client Testing:
+### For Client Testing
+
 ```bash
 # 1. Create LXC container on Proxmox
 curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/install_moxnas.sh | bash
@@ -58,9 +69,10 @@ CONTAINER_IP=$(pct exec 200 -- hostname -I | awk '{print $1}')
 # All tabs now functional: Dashboard, Storage, Shares, Network, Credentials, System, Reporting
 ```
 
-### All Client Requirements Met:
+### All Client Requirements Met
 
 #### ✅ Core Services (Milestone 2)
+
 - SMB/CIFS file sharing
 - NFS exports
 - FTP server  
@@ -69,6 +81,7 @@ CONTAINER_IP=$(pct exec 200 -- hostname -I | awk '{print $1}')
 - iSCSI targets
 
 #### ✅ Web Interface Features (Milestone 3)
+
 - **Dashboard:** System metrics, service status, network interfaces
 - **Storage:** Mount points, datasets, disk usage monitoring
 - **Shares:** SMB/NFS/FTP share creation and management  
@@ -78,6 +91,7 @@ CONTAINER_IP=$(pct exec 200 -- hostname -I | awk '{print $1}')
 - **Reporting:** Performance monitoring and system logs
 
 #### ✅ Advanced Features  
+
 - Access Control Lists (ACLs) ⭐ (Previously missing)
 - Dataset management with compression options
 - User authentication and authorization
@@ -95,6 +109,7 @@ CONTAINER_IP=$(pct exec 200 -- hostname -I | awk '{print $1}')
 ## Testing
 
 Client can now:
+
 1. Install MoxNAS with one command
 2. Access web interface at container IP:8080  
 3. Manage users, groups, and ACLs in Credentials tab
