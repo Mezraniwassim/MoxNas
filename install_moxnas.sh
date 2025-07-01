@@ -49,30 +49,71 @@ check_container() {
     fi
 }
 
-# Detect available storage
+# Detect available storage and check configuration
 detect_storage() {
-    log_info "Detecting available storage..."
+    log_info "Detecting Proxmox storage configuration..."
     
-    # Try to find a suitable storage for containers
+    # Show current storage status for debugging
+    log_info "Available storage:"
+    pvesm status
+    
+    # Find storage that supports containers/VMs
     STORAGE_NAME=""
-    for storage in local-lvm local local-zfs; do
-        if pvesm status | grep -q "^$storage "; then
-            STORAGE_NAME="$storage"
+    
+    # Check each storage and verify it supports containers
+    while IFS= read -r line; do
+        storage_name=$(echo "$line" | awk '{print $1}')
+        storage_type=$(echo "$line" | awk '{print $2}')
+        storage_status=$(echo "$line" | awk '{print $3}')
+        
+        # Skip header and inactive storage
+        if [[ "$storage_name" == "Name" ]] || [[ "$storage_status" != "active" ]]; then
+            continue
+        fi
+        
+        # Check if this storage supports containers
+        if pvesm status -storage "$storage_name" 2>/dev/null | grep -q "content.*vztmpl\|content.*rootdir\|content.*images"; then
+            STORAGE_NAME="$storage_name"
+            log_info "Found suitable storage: $storage_name (type: $storage_type)"
             break
         fi
-    done
+    done < <(pvesm status)
     
+    # If no suitable storage found, try common names
     if [ -z "$STORAGE_NAME" ]; then
-        # Fallback: use the first available storage that supports containers
-        STORAGE_NAME=$(pvesm status | awk 'NR>1 && /active/ {print $1}' | head -1)
+        for storage in local-lvm local local-zfs pve-local; do
+            if pvesm status | grep -q "^$storage.*active"; then
+                STORAGE_NAME="$storage"
+                log_info "Using fallback storage: $storage"
+                break
+            fi
+        done
+    fi
+    
+    # Last resort: use first active storage
+    if [ -z "$STORAGE_NAME" ]; then
+        STORAGE_NAME=$(pvesm status | awk 'NR>1 && $3=="active" {print $1}' | head -1)
+        if [ -n "$STORAGE_NAME" ]; then
+            log_warning "Using first available storage: $STORAGE_NAME"
+        fi
     fi
     
     if [ -z "$STORAGE_NAME" ]; then
-        log_error "No suitable storage found"
+        log_error "No active storage found"
+        log_error "Please check your Proxmox storage configuration"
         exit 1
     fi
     
-    log_success "Using storage: $STORAGE_NAME"
+    log_success "Selected storage: $STORAGE_NAME"
+    
+    # Verify storage can be used for containers
+    log_info "Verifying storage supports containers..."
+    if ! pvesm status -storage "$STORAGE_NAME" >/dev/null 2>&1; then
+        log_error "Storage $STORAGE_NAME is not accessible"
+        exit 1
+    fi
+    
+    log_success "Storage verification complete"
 }
 
 # Download Ubuntu template if not exists
@@ -105,8 +146,11 @@ download_template() {
 create_container() {
     log_info "Creating LXC container $CONTAINER_ID..."
     
-    # Create container
-    pct create "$CONTAINER_ID" \
+    # Show the command that will be executed
+    log_info "Executing: pct create $CONTAINER_ID local:vztmpl/$TEMPLATE --rootfs $STORAGE_NAME:$DISK_SIZE"
+    
+    # Create container with error handling
+    if ! pct create "$CONTAINER_ID" \
         local:vztmpl/"$TEMPLATE" \
         --hostname "$CONTAINER_HOSTNAME" \
         --password "$CONTAINER_PASSWORD" \
@@ -117,7 +161,32 @@ create_container() {
         --features nesting=1 \
         --unprivileged 0 \
         --onboot 1 \
-        --start 1
+        --start 1; then
+        
+        log_error "Container creation failed. Debugging information:"
+        log_error "Storage: $STORAGE_NAME"
+        log_error "Template: $TEMPLATE" 
+        log_error "Disk size: $DISK_SIZE"
+        
+        log_info "Manual creation command:"
+        log_info "pct create $CONTAINER_ID local:vztmpl/$TEMPLATE \\"
+        log_info "  --hostname $CONTAINER_HOSTNAME \\"
+        log_info "  --password $CONTAINER_PASSWORD \\"
+        log_info "  --cores $CORES \\"
+        log_info "  --memory $MEMORY \\"
+        log_info "  --rootfs $STORAGE_NAME:$DISK_SIZE \\"
+        log_info "  --net0 name=eth0,bridge=vmbr0,ip=dhcp \\"
+        log_info "  --features nesting=1 \\"
+        log_info "  --unprivileged 0 \\"
+        log_info "  --start 1"
+        
+        log_error "Please check your Proxmox storage configuration:"
+        log_error "1. Run: pvesm status"
+        log_error "2. Verify storage supports containers"
+        log_error "3. Check available space"
+        
+        exit 1
+    fi
         
     log_success "Container $CONTAINER_ID created and started"
 }
