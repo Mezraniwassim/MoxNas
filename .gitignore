@@ -1,0 +1,257 @@
+# MoxNAS Project .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/static/
+/staticfiles/
+/media/
+.env
+.env.local
+.env.production
+.env.development
+
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+.npm
+.eslintcache
+
+# React Build Output
+frontend/build/
+frontend/dist/
+build/
+dist/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Icon?
+.directory
+*~
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime Data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage Directory
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency Directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env.test
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# MoxNAS Specific
+# Configuration Files with Sensitive Data
+proxmox_credentials.json
+moxnas_config.json
+certificates/
+ssl/
+private_keys/
+*.pem
+*.key
+*.crt
+
+# Runtime and Cache
+cache/
+tmp/
+temp/
+uploads/
+
+# Development Files
+.development
+.testing
+test_data/
+mock_data/
+
+# Backup Files
+*.backup
+backup/
+backups/
+
+# Service Logs
+service_logs/
+application.log
+error.log
+access.log
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Compiled Templates
+templates_c/
+
+# Session Files
+sessions/
+
+# Lock Files (keep package-lock.json and yarn.lock for reproducible builds)
+# package-lock.json (commented out - should be committed)
+# yarn.lock (commented out - should be committed)
+
+# Build Artifacts
+*.tar.gz
+*.zip
+*.war
+*.ear
+*.jar
+
+# Local Development Override Files
+docker-compose.local.yml
+local_settings.py
+development_settings.py
+
+# Test Results
+test-results/
+test-output/
+junit.xml
+test_reports/
+
+# Documentation Build Output
+docs/_build/
+docs/build/
+site/
+
+# Security Files
+.secrets
+secrets/
+private/
+credentials/
+
+# Monitoring and Analytics
+.analytics
+monitoring/
+stats/
+
+# User Uploaded Content
+user_uploads/
+user_data/
+customer_data/

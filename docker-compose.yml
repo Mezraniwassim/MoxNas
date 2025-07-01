@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  moxnas:
+    build: .
+    container_name: moxnas
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8000:8000"
+    volumes:
+      # Persistent data
+      - moxnas_data:/opt/moxnas/backend/db.sqlite3
+      - moxnas_static:/opt/moxnas/backend/staticfiles
+      - moxnas_media:/opt/moxnas/backend/media
+      
+      # Mount points for NAS storage
+      - /mnt/storage1:/mnt/storage1:rshared
+      - /mnt/storage2:/mnt/storage2:rshared
+      
+      # Configuration
+      - ./config:/opt/moxnas/config
+    environment:
+      - DEBUG=false
+      - ALLOWED_HOSTS=*
+    networks:
+      - moxnas_network
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse
+    privileged: true  # Required for NFS, SMB services
+    
+volumes:
+  moxnas_data:
+    driver: local
+  moxnas_static:
+    driver: local
+  moxnas_media:
+    driver: local
+
+networks:
+  moxnas_network:
+    driver: bridge

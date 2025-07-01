@@ -1,0 +1,17 @@
+[Unit]
+Description=MoxNAS Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/moxnas
+Environment=PATH=/opt/moxnas/venv/bin
+ExecStartPre=/bin/bash -c 'cd /opt/moxnas && source venv/bin/activate && python manage.py migrate'
+ExecStart=/opt/moxnas/venv/bin/python /opt/moxnas/start_moxnas.py --production
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
