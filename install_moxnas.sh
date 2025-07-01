@@ -57,7 +57,14 @@ detect_storage() {
     log_info "Available storage:"
     pvesm status
     
-    # Find storage that supports containers/VMs
+    # Also show LVM information for debugging
+    log_info "LVM Volume Groups:"
+    vgs 2>/dev/null || log_warning "LVM not available or no volume groups found"
+    
+    log_info "LVM Logical Volumes:"
+    lvs 2>/dev/null || log_warning "LVM not available or no logical volumes found"
+    
+    # Find storage that supports containers and has enough space
     STORAGE_NAME=""
     
     # Check each storage and verify it supports containers
@@ -65,53 +72,75 @@ detect_storage() {
         storage_name=$(echo "$line" | awk '{print $1}')
         storage_type=$(echo "$line" | awk '{print $2}')
         storage_status=$(echo "$line" | awk '{print $3}')
+        storage_avail=$(echo "$line" | awk '{print $5}')
         
         # Skip header and inactive storage
         if [[ "$storage_name" == "Name" ]] || [[ "$storage_status" != "active" ]]; then
             continue
         fi
         
-        # Check if this storage supports containers
-        if pvesm status -storage "$storage_name" 2>/dev/null | grep -q "content.*vztmpl\|content.*rootdir\|content.*images"; then
+        # Check available space (need at least 8GB = 8388608 KB)
+        if [[ "$storage_avail" =~ ^[0-9]+$ ]] && [ "$storage_avail" -lt 8388608 ]; then
+            log_warning "Storage $storage_name has insufficient space: ${storage_avail}KB available"
+            continue
+        fi
+        
+        # Prefer LVM-thin or directory storage for containers
+        if [[ "$storage_type" == "lvmthin" ]] || [[ "$storage_type" == "dir" ]]; then
             STORAGE_NAME="$storage_name"
-            log_info "Found suitable storage: $storage_name (type: $storage_type)"
+            log_info "Found suitable storage: $storage_name (type: $storage_type, available: ${storage_avail}KB)"
             break
         fi
     done < <(pvesm status)
     
-    # If no suitable storage found, try common names
+    # If no LVM-thin or dir found, try any storage that supports containers
+    if [ -z "$STORAGE_NAME" ]; then
+        while IFS= read -r line; do
+            storage_name=$(echo "$line" | awk '{print $1}')
+            storage_type=$(echo "$line" | awk '{print $2}')
+            storage_status=$(echo "$line" | awk '{print $3}')
+            
+            # Skip header and inactive storage
+            if [[ "$storage_name" == "Name" ]] || [[ "$storage_status" != "active" ]]; then
+                continue
+            fi
+            
+            # Check if this storage supports containers by checking content types
+            storage_content=$(pvesm status -storage "$storage_name" 2>/dev/null | grep -o "content.*" | head -1)
+            if echo "$storage_content" | grep -q "vztmpl\|rootdir\|images"; then
+                STORAGE_NAME="$storage_name"
+                log_info "Found storage with container support: $storage_name (type: $storage_type)"
+                break
+            fi
+        done < <(pvesm status)
+    fi
+    
+    # If still no suitable storage found, try common names
     if [ -z "$STORAGE_NAME" ]; then
         for storage in local-lvm local local-zfs pve-local; do
             if pvesm status | grep -q "^$storage.*active"; then
                 STORAGE_NAME="$storage"
-                log_info "Using fallback storage: $storage"
+                log_warning "Using fallback storage: $storage"
                 break
             fi
         done
     fi
     
-    # Last resort: use first active storage
     if [ -z "$STORAGE_NAME" ]; then
-        STORAGE_NAME=$(pvesm status | awk 'NR>1 && $3=="active" {print $1}' | head -1)
-        if [ -n "$STORAGE_NAME" ]; then
-            log_warning "Using first available storage: $STORAGE_NAME"
-        fi
-    fi
-    
-    if [ -z "$STORAGE_NAME" ]; then
-        log_error "No active storage found"
-        log_error "Please check your Proxmox storage configuration"
+        log_error "No suitable storage found for containers"
+        log_error "Available storage:"
+        pvesm status
+        log_error ""
+        log_error "Please ensure you have storage configured that supports containers."
+        log_error "Storage must have 'images' or 'rootdir' content type enabled."
         exit 1
     fi
     
     log_success "Selected storage: $STORAGE_NAME"
     
-    # Verify storage can be used for containers
-    log_info "Verifying storage supports containers..."
-    if ! pvesm status -storage "$STORAGE_NAME" >/dev/null 2>&1; then
-        log_error "Storage $STORAGE_NAME is not accessible"
-        exit 1
-    fi
+    # Show storage details for verification
+    log_info "Storage details:"
+    pvesm status -storage "$STORAGE_NAME" 2>/dev/null || log_warning "Could not get detailed storage info"
     
     log_success "Storage verification complete"
 }
