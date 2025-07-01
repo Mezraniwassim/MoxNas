@@ -120,27 +120,39 @@ detect_storage() {
 download_template() {
     log_info "Checking Ubuntu template..."
     
-    # Check if template exists (try both full name and simple name)
-    if ! pveam list local | grep -q "$TEMPLATE_SIMPLE"; then
+    # First check what templates are available
+    log_info "Available templates:"
+    pveam list local | grep ubuntu || true
+    
+    # Check if any Ubuntu 22.04 template exists
+    if ! pveam list local | grep -q "ubuntu-22.04"; then
         log_info "Downloading Ubuntu 22.04 template..."
+        pveam update
+        
+        # Try to download the specific template
         if ! pveam download local "$TEMPLATE"; then
-            # Try alternative template names
-            log_info "Trying alternative template..."
-            pveam update
-            pveam available | grep ubuntu-22.04 | head -1 | awk '{print $2}' | xargs pveam download local
+            # Try to find and download any Ubuntu 22.04 template
+            log_info "Trying to find available Ubuntu 22.04 templates..."
+            AVAILABLE_TEMPLATE=$(pveam available | grep ubuntu-22.04 | head -1 | awk '{print $2}')
+            if [ -n "$AVAILABLE_TEMPLATE" ]; then
+                log_info "Downloading: $AVAILABLE_TEMPLATE"
+                pveam download local "$AVAILABLE_TEMPLATE"
+            else
+                log_error "No Ubuntu 22.04 template found"
+                exit 1
+            fi
         fi
     fi
     
-    # Update the template name to what's actually available (filename only, not full path)
-    TEMPLATE_FULL=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}')
-    TEMPLATE=$(echo "$TEMPLATE_FULL" | sed 's/.*://')
+    # Get the actual template filename (just the filename, not the full path)
+    TEMPLATE=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}' | sed 's/.*://')
     
     if [ -z "$TEMPLATE" ]; then
-        log_error "Could not find Ubuntu 22.04 template"
+        log_error "Could not find Ubuntu 22.04 template after download"
         exit 1
     fi
     
-    log_success "Ubuntu template available: $TEMPLATE"
+    log_success "Using Ubuntu template: $TEMPLATE"
 }
 
 # Create LXC container
@@ -148,11 +160,13 @@ create_container() {
     log_info "Creating LXC container $CONTAINER_ID..."
     
     # Show the command that will be executed
-    log_info "Executing: pct create $CONTAINER_ID local:vztmpl/$TEMPLATE --rootfs $STORAGE_NAME:$DISK_SIZE"
+    log_info "Template file: $TEMPLATE"
+    log_info "Storage: $STORAGE_NAME"
+    log_info "Full command: pct create $CONTAINER_ID local:vztmpl/$TEMPLATE --rootfs $STORAGE_NAME:$DISK_SIZE"
     
     # Create container with error handling
     if ! pct create "$CONTAINER_ID" \
-        local:vztmpl/"$TEMPLATE" \
+        "local:vztmpl/$TEMPLATE" \
         --hostname "$CONTAINER_HOSTNAME" \
         --password "$CONTAINER_PASSWORD" \
         --cores "$CORES" \
