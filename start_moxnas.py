@@ -12,6 +12,16 @@ import time
 import signal
 from pathlib import Path
 
+# Detect virtual environment Python
+def get_python_executable():
+    """Get the correct Python executable (virtual environment if available)"""
+    script_dir = Path(__file__).parent
+    venv_python = script_dir / 'venv' / 'bin' / 'python'
+    
+    if venv_python.exists():
+        return str(venv_python)
+    return sys.executable
+
 # Ensure .env file is in the correct location
 env_file = Path(__file__).parent / '.env'
 if env_file.exists():
@@ -27,11 +37,11 @@ def start_django():
     
     # Run migrations
     print("📦 Running Django migrations...")
-    subprocess.run([sys.executable, 'manage.py', 'migrate'], check=True)
+    subprocess.run([get_python_executable(), 'manage.py', 'migrate'], check=True)
     
     # Create initial data
     print("🛠️ Creating initial service data...")
-    subprocess.run([sys.executable, 'manage.py', 'shell', '-c', '''
+    subprocess.run([get_python_executable(), 'manage.py', 'shell', '-c', '''
 from core.models import ServiceStatus
 services = [
     {"name": "smb", "port": 445},
@@ -51,7 +61,7 @@ print("✅ Initial services created")
     
     # Start Django server
     print("🌐 Starting Django server on http://localhost:8000")
-    subprocess.run([sys.executable, 'manage.py', 'runserver', '0.0.0.0:8000'])
+    subprocess.run([get_python_executable(), 'manage.py', 'runserver', '0.0.0.0:8000'])
 
 def start_react():
     """Start React development server"""
@@ -97,12 +107,12 @@ def start_production():
     
     # Run migrations
     print("📦 Running Django migrations...")
-    subprocess.run([sys.executable, 'manage.py', 'migrate'], check=True)
-    subprocess.run([sys.executable, 'manage.py', 'collectstatic', '--noinput'], check=True)
+    subprocess.run([get_python_executable(), 'manage.py', 'migrate'], check=True)
+    subprocess.run([get_python_executable(), 'manage.py', 'collectstatic', '--noinput'], check=True)
     
     # Create initial data
     print("🛠️ Setting up initial services...")
-    subprocess.run([sys.executable, 'manage.py', 'shell', '-c', '''
+    subprocess.run([get_python_executable(), 'manage.py', 'shell', '-c', '''
 from core.models import ServiceStatus
 from users.models import MoxNASUser
 from django.contrib.auth import get_user_model

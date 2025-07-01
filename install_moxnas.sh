@@ -339,11 +339,10 @@ EOF
         chown -R root:root /opt/moxnas
         chmod +x start_moxnas.py
         
-        # Run initial Django setup
-        source venv/bin/activate
+        # Run initial Django setup with virtual environment
         cd backend
-        python manage.py migrate
-        python manage.py collectstatic --noinput
+        ../venv/bin/python manage.py migrate
+        ../venv/bin/python manage.py collectstatic --noinput
         cd ..
     "
     
