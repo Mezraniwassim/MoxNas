@@ -131,8 +131,9 @@ download_template() {
         fi
     fi
     
-    # Update the template name to what's actually available
-    TEMPLATE=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}')
+    # Update the template name to what's actually available (filename only, not full path)
+    TEMPLATE_FULL=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}')
+    TEMPLATE=$(echo "$TEMPLATE_FULL" | sed 's/.*://')
     
     if [ -z "$TEMPLATE" ]; then
         log_error "Could not find Ubuntu 22.04 template"
