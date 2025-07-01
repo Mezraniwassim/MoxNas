@@ -2,6 +2,14 @@
 
 MoxNAS is a lightweight, containerized Network Attached Storage (NAS) solution designed to run in LXC containers on Proxmox. It provides a TrueNAS-like experience without requiring ZFS, virtualization features, or application support.
 
+## 🚀 Quick Start
+
+**One-line installation:**
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash
+```
+
 ## Features
 
 - **Containerized Architecture**: Runs entirely within LXC containers
@@ -18,13 +26,16 @@ MoxNAS is a lightweight, containerized Network Attached Storage (NAS) solution d
 
 ```bash
 # Install with default container ID (200)
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/install_moxnas.sh | bash
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash
 
 # Install with custom container ID
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/install_moxnas.sh | bash -s 201
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash -s 201
 
-# Verify installation
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/verify_installation.sh | bash -s [container_id]
+# If installation fails, run the diagnostic helper
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/manual_install_helper.sh | bash
+
+# Debug storage configuration
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/debug_proxmox_storage.sh | bash
 ```
 
 ### Installation Process

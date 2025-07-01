@@ -1,8 +1,12 @@
 #!/bin/bash
 #
 # MoxNAS One-Line Installer for Proxmox LXC
-# Usage: curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/install_moxnas.sh | bash
-# Or with custom container ID: curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/install_moxnas.sh | bash -s 201
+# 
+# INSTALLATION COMMANDS:
+# Default installation:  curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash
+# Custom container ID:   curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash -s 201
+# Troubleshooting:       curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/manual_install_helper.sh | bash
+# Storage debugging:     curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/debug_proxmox_storage.sh | bash
 #
 
 set -e
