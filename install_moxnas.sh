@@ -12,6 +12,7 @@ CONTAINER_ID=${1:-200}
 CONTAINER_HOSTNAME="moxnas"
 CONTAINER_PASSWORD="moxnas123"
 TEMPLATE="ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
+TEMPLATE_SIMPLE="ubuntu-22.04-standard"
 DISK_SIZE="8G"
 MEMORY="2048"
 CORES="2"
@@ -48,14 +49,56 @@ check_container() {
     fi
 }
 
+# Detect available storage
+detect_storage() {
+    log_info "Detecting available storage..."
+    
+    # Try to find a suitable storage for containers
+    STORAGE_NAME=""
+    for storage in local-lvm local local-zfs; do
+        if pvesm status | grep -q "^$storage "; then
+            STORAGE_NAME="$storage"
+            break
+        fi
+    done
+    
+    if [ -z "$STORAGE_NAME" ]; then
+        # Fallback: use the first available storage that supports containers
+        STORAGE_NAME=$(pvesm status | awk 'NR>1 && /active/ {print $1}' | head -1)
+    fi
+    
+    if [ -z "$STORAGE_NAME" ]; then
+        log_error "No suitable storage found"
+        exit 1
+    fi
+    
+    log_success "Using storage: $STORAGE_NAME"
+}
+
 # Download Ubuntu template if not exists
 download_template() {
     log_info "Checking Ubuntu template..."
-    if ! pveam list local | grep -q "$TEMPLATE"; then
+    
+    # Check if template exists (try both full name and simple name)
+    if ! pveam list local | grep -q "$TEMPLATE_SIMPLE"; then
         log_info "Downloading Ubuntu 22.04 template..."
-        pveam download local "$TEMPLATE"
+        if ! pveam download local "$TEMPLATE"; then
+            # Try alternative template names
+            log_info "Trying alternative template..."
+            pveam update
+            pveam available | grep ubuntu-22.04 | head -1 | awk '{print $2}' | xargs pveam download local
+        fi
     fi
-    log_success "Ubuntu template available"
+    
+    # Update the template name to what's actually available
+    TEMPLATE=$(pveam list local | grep ubuntu-22.04 | head -1 | awk '{print $1}')
+    
+    if [ -z "$TEMPLATE" ]; then
+        log_error "Could not find Ubuntu 22.04 template"
+        exit 1
+    fi
+    
+    log_success "Ubuntu template available: $TEMPLATE"
 }
 
 # Create LXC container
@@ -69,7 +112,7 @@ create_container() {
         --password "$CONTAINER_PASSWORD" \
         --cores "$CORES" \
         --memory "$MEMORY" \
-        --rootfs local-lvm:"$DISK_SIZE" \
+        --rootfs "$STORAGE_NAME":"$DISK_SIZE" \
         --net0 name=eth0,bridge=vmbr0,ip=dhcp \
         --features nesting=1 \
         --unprivileged 0 \
@@ -359,6 +402,7 @@ main() {
     
     check_proxmox
     check_container
+    detect_storage
     download_template
     create_container
     wait_container
