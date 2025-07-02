@@ -110,40 +110,9 @@ def start_production():
     subprocess.run([get_python_executable(), 'manage.py', 'migrate'], check=True)
     subprocess.run([get_python_executable(), 'manage.py', 'collectstatic', '--noinput'], check=True)
     
-    # Create initial data
-    print("🛠️ Setting up initial services...")
-    subprocess.run([get_python_executable(), 'manage.py', 'shell', '-c', '''
-from core.models import ServiceStatus
-from users.models import MoxNASUser
-from django.contrib.auth import get_user_model
-
-# Create default admin user if it doesn't exist
-User = get_user_model()
-if not User.objects.filter(username="admin").exists():
-    User.objects.create_superuser(
-        username="admin",
-        email="admin@moxnas.local",
-        password="moxnas123",
-        full_name="MoxNAS Administrator"
-    )
-    print("✅ Admin user created (admin/moxnas123)")
-
-# Create service entries
-services = [
-    {"name": "smb", "port": 445},
-    {"name": "nfs", "port": 2049},
-    {"name": "ftp", "port": 21},
-    {"name": "ssh", "port": 22},
-    {"name": "snmp", "port": 161},
-    {"name": "iscsi", "port": 3260},
-]
-for service_data in services:
-    ServiceStatus.objects.get_or_create(
-        name=service_data["name"],
-        defaults={"port": service_data["port"]}
-    )
-print("✅ Services initialized")
-'''], check=False)
+    # Initialize services and data using management command
+    print("🛠️ Initializing MoxNAS services and data...")
+    subprocess.run([get_python_executable(), 'manage.py', 'initialize_services'], check=False)
     
     print("🌐 Starting MoxNAS web server on http://0.0.0.0:8000")
     # Start gunicorn on port 8000 

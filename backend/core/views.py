@@ -63,6 +63,10 @@ class ServiceStatusViewSet(viewsets.ModelViewSet):
         super().__init__(*args, **kwargs)
         self.service_manager = ServiceManager()
     
+    def get_queryset(self):
+        """Ensure services exist before returning queryset"""
+        return ServiceStatus.ensure_services_exist()
+    
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         """Start a service"""

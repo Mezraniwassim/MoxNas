@@ -334,7 +334,7 @@ install_moxnas() {
         # Install Python dependencies
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install gunicorn
+        pip install gunicorn psutil
         
         # Install Node.js dependencies and build frontend
         cd frontend
@@ -468,6 +468,127 @@ EOF
     log_success "NAS services configured"
 }
 
+# Fix service configurations and permissions
+fix_service_configurations() {
+    log_info "Fixing service configurations and permissions..."
+    
+    pct exec "$CONTAINER_ID" -- bash -c "
+        # Fix NFS exports - remove duplicate entries
+        if [ -f /etc/exports ]; then
+            # Remove duplicate entries for /mnt/storage
+            grep -v '^/mnt/storage' /etc/exports > /tmp/exports.tmp || true
+            echo '/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)' >> /tmp/exports.tmp
+            mv /tmp/exports.tmp /etc/exports
+        else
+            echo '/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)' > /etc/exports
+        fi
+        
+        # Fix Samba configuration - remove duplicate www share
+        if [ -f /etc/samba/smb.conf ]; then
+            # Remove the www share section that was causing issues
+            sed -i '/\[www\]/,/^$/d' /etc/samba/smb.conf
+        fi
+        
+        # Ensure storage directories have proper permissions
+        mkdir -p /mnt/storage
+        chmod 755 /mnt/storage
+        chown root:root /mnt/storage
+        
+        # Create MoxNAS config and log directories
+        mkdir -p /etc/moxnas /var/log/moxnas
+        chmod 755 /etc/moxnas /var/log/moxnas
+        
+        # Fix Django database permissions
+        cd /opt/moxnas/backend
+        chmod 664 db.sqlite3 2>/dev/null || true
+        
+        # Install missing Python package
+        cd /opt/moxnas
+        source venv/bin/activate
+        pip install psutil 2>/dev/null || true
+        
+        # Run Django migrations to ensure database is up to date
+        cd backend
+        python manage.py migrate --run-syncdb 2>/dev/null || true
+        
+        # Initialize services using management command
+        python manage.py initialize_services 2>/dev/null || true
+        
+        # Reload NFS exports
+        exportfs -ra 2>/dev/null || true
+        
+        # Restart services to apply new configurations
+        systemctl restart smbd nmbd 2>/dev/null || true
+        systemctl restart nfs-kernel-server 2>/dev/null || true
+    "
+    
+    log_success "Service configurations fixed"
+}
+
+# Verify and fix MoxNAS startup
+verify_moxnas_startup() {
+    log_info "Verifying MoxNAS startup..."
+    
+    # Wait a moment for services to start
+    sleep 10
+    
+    # Check if MoxNAS systemd service is running
+    if pct exec "$CONTAINER_ID" -- systemctl is-active moxnas &> /dev/null; then
+        log_success "MoxNAS systemd service is running"
+        return 0
+    fi
+    
+    log_warning "MoxNAS systemd service failed, attempting manual start..."
+    
+    # Try manual start with gunicorn
+    pct exec "$CONTAINER_ID" -- bash -c "
+        cd /opt/moxnas
+        source venv/bin/activate
+        
+        # Ensure gunicorn is installed
+        pip install gunicorn &> /dev/null || log_warning 'Failed to install gunicorn'
+        
+        # Run Django migrations and collectstatic
+        cd backend
+        python manage.py migrate &> /dev/null || log_warning 'Migrations failed'
+        python manage.py collectstatic --noinput &> /dev/null || log_warning 'Collectstatic failed'
+        python manage.py initialize_services &> /dev/null || log_warning 'Service initialization failed'
+        
+        # Start gunicorn manually
+        gunicorn --bind 0.0.0.0:8000 --workers 3 moxnas.wsgi:application --daemon
+    "
+    
+    # Wait and check if gunicorn started
+    sleep 5
+    if pct exec "$CONTAINER_ID" -- ps aux | grep -q "gunicorn.*8000"; then
+        log_success "MoxNAS started manually with gunicorn"
+        
+        # Create a simple startup script for future reboots
+        pct exec "$CONTAINER_ID" -- bash -c "
+            cat > /usr/local/bin/start-moxnas.sh << 'EOF'
+#!/bin/bash
+cd /opt/moxnas
+source venv/bin/activate
+cd backend
+gunicorn --bind 0.0.0.0:8000 --workers 3 moxnas.wsgi:application --daemon
+EOF
+            chmod +x /usr/local/bin/start-moxnas.sh
+            
+            # Add to rc.local for auto-start
+            if ! grep -q 'start-moxnas.sh' /etc/rc.local; then
+                sed -i '/^exit 0/i /usr/local/bin/start-moxnas.sh' /etc/rc.local
+            fi
+        "
+        log_info "Created startup script for future container restarts"
+        return 0
+    fi
+    
+    log_error "Failed to start MoxNAS manually. Please check logs:"
+    log_error "  pct exec $CONTAINER_ID -- journalctl -u moxnas"
+    log_error "  pct exec $CONTAINER_ID -- cd /opt/moxnas && source venv/bin/activate && python backend/manage.py runserver 0.0.0.0:8000"
+    return 1
+}
+
 # Start all services
 start_services() {
     log_info "Starting all services..."
@@ -527,6 +648,23 @@ show_info() {
     echo "  Add storage: pct set \$CONTAINER_ID -mp0 /host/path,mp=/mnt/storage"
     echo "  Then restart: pct restart \$CONTAINER_ID"
     echo ""
+    echo "Troubleshooting:"
+    echo "  Manual start: pct exec \$CONTAINER_ID -- /usr/local/bin/start-moxnas.sh"
+    echo "  Check logs: pct exec \$CONTAINER_ID -- journalctl -u moxnas -f"
+    echo "  Web test: curl -I http://\$CONTAINER_IP:8000"
+    echo ""
+    
+    # Final verification test
+    log_info "Performing final web interface test..."
+    if curl -I "http://\$CONTAINER_IP:8000" &> /dev/null; then
+        log_success "✅ MoxNAS web interface is accessible!"
+        log_success "🌐 Open: http://\$CONTAINER_IP:8000"
+        log_success "👤 Login: admin / moxnas123"
+    else
+        log_warning "⚠️  Web interface test failed. Try manual commands above."
+    fi
+    
+    echo ""
     log_success "Installation completed successfully!"
 }
 
@@ -546,7 +684,9 @@ main() {
     install_moxnas
     setup_service
     configure_services
+    fix_service_configurations
     start_services
+    verify_moxnas_startup
     show_info
 }
 
