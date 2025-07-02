@@ -5,6 +5,7 @@
 # INSTALLATION COMMANDS:
 # Default installation:  curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash
 # Custom container ID:   curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash -s 201
+# Skip network check:    curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash -s 200 skip
 # Troubleshooting:       curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/manual_install_helper.sh | bash
 # Storage debugging:     curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/debug_proxmox_storage.sh | bash
 #
@@ -13,6 +14,7 @@ set -e
 
 # Configuration
 CONTAINER_ID=${1:-200}
+SKIP_NETWORK_CHECK=${2:-false}
 CONTAINER_HOSTNAME="moxnas"
 CONTAINER_PASSWORD="moxnas123"
 TEMPLATE="ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
@@ -254,10 +256,18 @@ wait_container() {
     log_info "Waiting for container to be ready..."
     sleep 15
     
+    # Skip network check if requested
+    if [ "$SKIP_NETWORK_CHECK" = "true" ] || [ "$SKIP_NETWORK_CHECK" = "skip" ]; then
+        log_warning "Skipping network connectivity check as requested"
+        log_success "Container startup completed (network check bypassed)"
+        return 0
+    fi
+    
     # Wait for network
     timeout=60
     while [ $timeout -gt 0 ]; do
-        if pct exec "$CONTAINER_ID" -- ping -c 1 8.8.8.8 &> /dev/null; then
+        # Check if container has a valid IP address assigned
+        if pct exec "$CONTAINER_ID" -- ip addr show eth0 | grep -q "inet.*scope global" &> /dev/null; then
             break
         fi
         sleep 2
@@ -265,11 +275,12 @@ wait_container() {
     done
     
     if [ $timeout -eq 0 ]; then
-        log_error "Container network not ready"
-        exit 1
+        log_warning "Container network not ready - continuing anyway"
+        log_warning "You may need to configure network manually inside the container"
+        log_warning "Access container with: pct enter $CONTAINER_ID"
+    else
+        log_success "Container is ready"
     fi
-    
-    log_success "Container is ready"
 }
 
 # Install MoxNAS in container
