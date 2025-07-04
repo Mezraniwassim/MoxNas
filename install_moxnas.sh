@@ -498,6 +498,14 @@ fix_service_configurations() {
         mkdir -p /etc/moxnas /var/log/moxnas
         chmod 755 /etc/moxnas /var/log/moxnas
         
+        # Create additional service directories
+        mkdir -p /mnt/storage/shares /mnt/storage/ftp_users /var/lib/moxnas
+        chmod 755 /mnt/storage/shares /mnt/storage/ftp_users /var/lib/moxnas
+        
+        # Ensure proper exports file exists
+        touch /etc/exports
+        chmod 644 /etc/exports
+        
         # Fix Django database permissions
         cd /opt/moxnas/backend
         chmod 664 db.sqlite3 2>/dev/null || true

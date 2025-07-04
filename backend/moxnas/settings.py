@@ -30,12 +30,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'management',
     'core',
     'storage',
     'services',
     'network',
     'users',
     'proxmox',
+    'proxmox_integration',
 ]
 
 MIDDLEWARE = [
@@ -166,3 +168,22 @@ PROXMOX_USERNAME = config('PROXMOX_USERNAME', default='root')
 PROXMOX_PASSWORD = config('PROXMOX_PASSWORD', default='')
 PROXMOX_REALM = config('PROXMOX_REALM', default='pam')
 PROXMOX_SSL_VERIFY = config('PROXMOX_SSL_VERIFY', default=False, cast=bool)
+
+# Proxmox integration configuration (for compatibility with proxmox_integration app)
+PROXMOX_CONFIG = {
+    'host': PROXMOX_HOST,
+    'port': PROXMOX_PORT,
+    'username': PROXMOX_USERNAME,
+    'password': PROXMOX_PASSWORD,
+    'realm': PROXMOX_REALM,
+    'ssl_verify': PROXMOX_SSL_VERIFY,
+}
+
+# Network settings
+NETWORK_TIMEOUT = config('NETWORK_TIMEOUT', default=30, cast=int)
+NETWORK_RETRIES = config('NETWORK_RETRIES', default=3, cast=int)
+
+# Storage settings
+DEFAULT_STORAGE = config('DEFAULT_STORAGE', default='local')
+STORAGE_PATH = config('STORAGE_PATH', default='/var/lib/moxnas')
+MAX_STORAGE_SIZE = config('MAX_STORAGE_SIZE', default=1073741824, cast=int)  # 1GB default

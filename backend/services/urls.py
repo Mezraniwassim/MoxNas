@@ -17,4 +17,9 @@ urlpatterns = [
     path('stop/<str:service_name>/', views.stop_service, name='stop-service'),
     path('cloud-sync/<int:pk>/run/', views.run_cloud_sync_task, name='run-cloud-sync'),
     path('rsync/<int:pk>/run/', views.run_rsync_task, name='run-rsync'),
+    # FTP specific endpoints
+    path('ftp/configure/', views.configure_ftp, name='configure-ftp'),
+    path('ftp/users/create/', views.create_ftp_user, name='create-ftp-user'),
+    path('ftp/users/<str:username>/delete/', views.delete_ftp_user, name='delete-ftp-user'),
+    path('ftp/status/', views.get_ftp_status, name='ftp-status'),
 ]

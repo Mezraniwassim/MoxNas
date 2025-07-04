@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from .models import Dataset, Share, MountPoint
 from .serializers import DatasetSerializer, ShareSerializer, MountPointSerializer
-from services.service_manager import SambaManager, NFSManager
+from services.service_manager import SambaManager, NFSManager, FTPManager
 import os
 import subprocess
 import shutil
@@ -56,6 +56,7 @@ class ShareViewSet(viewsets.ModelViewSet):
         super().__init__(*args, **kwargs)
         self.samba_manager = SambaManager()
         self.nfs_manager = NFSManager()
+        self.ftp_manager = FTPManager()
     
     def perform_create(self, serializer):
         """Create share and configure service"""
@@ -105,9 +106,20 @@ class ShareViewSet(viewsets.ModelViewSet):
                     raise Exception("Failed to configure NFS export")
                     
             elif share.protocol == 'ftp':
-                # FTP configuration would go here
-                # For now, just ensure directory exists and has proper permissions
-                os.chmod(share.path, 0o755)
+                # Configure FTP access for the share
+                success = self.ftp_manager.configure_ftp(
+                    anonymous_enable=share.guest_ok,
+                    local_enable=True,
+                    write_enable=not share.read_only
+                )
+                if success:
+                    # Set proper permissions for FTP access
+                    self.ftp_manager.set_ftp_permissions(
+                        share.path, 
+                        read_only=share.read_only
+                    )
+                else:
+                    raise Exception("Failed to configure FTP service")
                 
         except Exception as e:
             # Log the error but don't fail the database operation
@@ -122,6 +134,11 @@ class ShareViewSet(viewsets.ModelViewSet):
                 self.samba_manager.remove_share(share.name)
             elif share.protocol == 'nfs':
                 self.nfs_manager.remove_export(share.path)
+            elif share.protocol == 'ftp':
+                # For FTP, we don't need to remove specific share configs
+                # since FTP access is managed through directory permissions
+                # But we can reset permissions to be more restrictive
+                os.chmod(share.path, 0o644)
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)

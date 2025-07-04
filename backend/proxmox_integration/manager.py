@@ -6,51 +6,94 @@ storage, networking, and system resources directly from MoxNAS.
 """
 
 import logging
-from typing import Optional, Dict, List, Any
+import time
+from typing import Optional, Dict, List, Any, Union
 from proxmoxer import ProxmoxAPI
 import ssl
+from .models import ProxmoxHost
 
 
 logger = logging.getLogger(__name__)
 
 
 class ProxmoxManager:
-    """Manages connection and operations with Proxmox VE host"""
+    """Enhanced Proxmox API Manager with session management and caching"""
     
-    def __init__(self, host: str, user: str = "root@pam", 
-                 port: int = 8006, verify_ssl: bool = False):
+    def __init__(self, host_config: Union[ProxmoxHost, Dict[str, Any], str]):
         """
         Initialize Proxmox manager
         
         Args:
-            host: Proxmox host IP/hostname (loaded from environment variables)
-            user: Proxmox user (default: root@pam)
-            port: Proxmox API port (default: 8006)
-            verify_ssl: Whether to verify SSL certificates
+            host_config: ProxmoxHost instance, configuration dict, or hostname string
         """
-        self.host = host
-        self.user = user
-        self.port = port
-        self.verify_ssl = verify_ssl
+        if isinstance(host_config, ProxmoxHost):
+            self.host = host_config.host
+            self.port = host_config.port
+            self.user = f"{host_config.username}@{host_config.realm}"
+            self.password = host_config.password
+            self.verify_ssl = host_config.ssl_verify
+            self.host_obj = host_config
+        elif isinstance(host_config, dict):
+            self.host = host_config['host']
+            self.port = host_config.get('port', 8006)
+            self.user = f"{host_config['username']}@{host_config.get('realm', 'pam')}"
+            self.password = host_config['password']
+            self.verify_ssl = host_config.get('ssl_verify', False)
+            self.host_obj = None
+        else:
+            # Legacy string hostname support
+            self.host = host_config
+            self.port = 8006
+            self.user = "root@pam"
+            self.password = None
+            self.verify_ssl = False
+            self.host_obj = None
+        
         self.api = None
         self.is_connected = False
+        self._session = None
+        self._last_auth_time = None
+        self._auth_timeout = 7200  # 2 hours
         
-    def connect(self, password: str) -> bool:
+    def _ensure_connection(self) -> bool:
         """
-        Connect to Proxmox VE API
+        Ensure we have a valid connection, reuse existing session if possible
+        
+        Returns:
+            bool: True if connection is valid
+        """
+        current_time = time.time()
+        
+        # Check if we need to authenticate
+        if (self.api is None or 
+            self._last_auth_time is None or 
+            current_time - self._last_auth_time > self._auth_timeout):
+            return self.connect()
+        
+        return self.is_connected
+        
+    def connect(self, password: str = None) -> bool:
+        """
+        Connect to Proxmox VE API with session management
         
         Args:
-            password: User password
+            password: User password (optional if already set)
             
         Returns:
             bool: True if connection successful
         """
         try:
+            # Use provided password or existing one
+            auth_password = password or self.password
+            if not auth_password:
+                logger.error("No password provided for Proxmox connection")
+                return False
+            
             # Create ProxmoxAPI connection with proper SSL handling
             self.api = ProxmoxAPI(
                 host=self.host,
                 user=self.user,
-                password=password,
+                password=auth_password,
                 verify_ssl=self.verify_ssl,
                 port=self.port
             )
@@ -58,17 +101,42 @@ class ProxmoxManager:
             # Test connection by getting version
             version = self.api.version.get()
             self.is_connected = True
+            self._last_auth_time = time.time()
+            
+            # Store password for session management
+            if password:
+                self.password = password
+            
             logger.info(f"Connected to Proxmox VE {version.get('version', 'Unknown')} at {self.host}")
             return True
             
         except Exception as e:
             logger.error(f"Failed to connect to Proxmox: {e}")
+            
+            # Provide helpful debugging information
+            if "ConnectTimeoutError" in str(e) or "timed out" in str(e):
+                logger.error("Connection timeout - possible causes:")
+                logger.error("1. Proxmox host is not reachable from this network")
+                logger.error("2. Firewall blocking port 8006")
+                logger.error("3. Proxmox service not running")
+                logger.error(f"4. Verify host {self.host} is accessible")
+            elif "SSLError" in str(e):
+                logger.error("SSL Error - possible causes:")
+                logger.error("1. Self-signed certificate (normal for Proxmox)")
+                logger.error("2. Set ssl_verify=False in configuration")
+            elif "401" in str(e) or "authentication" in str(e).lower():
+                logger.error("Authentication error - check credentials:")
+                logger.error(f"1. Username: {self.user}")
+                logger.error("2. Password: [hidden]")
+                logger.error("3. Realm: usually 'pam' or 'pve'")
+            
             self.is_connected = False
+            self._last_auth_time = None
             return False
     
     def get_cluster_status(self) -> Dict[str, Any]:
         """Get cluster status information"""
-        if not self.is_connected:
+        if not self._ensure_connection():
             return {"error": "Not connected to Proxmox"}
         
         try:
@@ -80,7 +148,7 @@ class ProxmoxManager:
     
     def get_nodes(self) -> List[Dict[str, Any]]:
         """Get list of Proxmox nodes"""
-        if not self.is_connected:
+        if not self._ensure_connection():
             return []
         
         try:
@@ -92,7 +160,7 @@ class ProxmoxManager:
     
     def get_node_status(self, node: str) -> Dict[str, Any]:
         """Get detailed status of a specific node"""
-        if not self.is_connected:
+        if not self._ensure_connection():
             return {"error": "Not connected to Proxmox"}
         
         try:

@@ -11,7 +11,7 @@ from .serializers import (
     ServiceConfigSerializer, CloudSyncTaskSerializer, 
     RsyncTaskSerializer, TaskLogSerializer, UPSConfigSerializer
 )
-from .service_manager import ServiceManager, SambaManager, NFSManager, SystemInfoManager
+from .service_manager import ServiceManager, SambaManager, NFSManager, FTPManager, SystemInfoManager
 
 class ServiceConfigViewSet(viewsets.ModelViewSet):
     queryset = ServiceConfig.objects.all()
@@ -194,6 +194,92 @@ def run_cloud_sync_task(request, pk):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def configure_ftp(request):
+    """Configure FTP service settings"""
+    try:
+        data = request.data
+        ftp_manager = FTPManager()
+        
+        success = ftp_manager.configure_ftp(
+            anonymous_enable=data.get('anonymous_enable', True),
+            local_enable=data.get('local_enable', True),
+            write_enable=data.get('write_enable', True)
+        )
+        
+        if success:
+            # Restart FTP service to apply changes
+            ftp_manager.restart_ftp_service()
+            return Response({'success': True, 'message': 'FTP configured successfully'})
+        else:
+            return Response({'success': False, 'error': 'Failed to configure FTP'}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_ftp_user(request):
+    """Create a new FTP user"""
+    try:
+        data = request.data
+        username = data.get('username')
+        password = data.get('password')
+        home_dir = data.get('home_dir')
+        
+        if not username or not password:
+            return Response({'success': False, 'error': 'Username and password are required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        ftp_manager = FTPManager()
+        success = ftp_manager.create_ftp_user(username, password, home_dir)
+        
+        if success:
+            return Response({'success': True, 'message': f'FTP user {username} created successfully'})
+        else:
+            return Response({'success': False, 'error': 'Failed to create FTP user'}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_ftp_user(request, username):
+    """Delete an FTP user"""
+    try:
+        ftp_manager = FTPManager()
+        success = ftp_manager.delete_ftp_user(username)
+        
+        if success:
+            return Response({'success': True, 'message': f'FTP user {username} deleted successfully'})
+        else:
+            return Response({'success': False, 'error': 'Failed to delete FTP user'}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_ftp_status(request):
+    """Get FTP service status and configuration"""
+    try:
+        ftp_manager = FTPManager()
+        ftp_status = ftp_manager.get_ftp_status()
+        
+        return Response({
+            'success': True,
+            'data': ftp_status
+        })
+            
+    except Exception as e:
+        return Response({'success': False, 'error': str(e)}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 def run_rsync_task(request, pk):
     """Manually run an rsync task"""
     task = get_object_or_404(RsyncTask, pk=pk)

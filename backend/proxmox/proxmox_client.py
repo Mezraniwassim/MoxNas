@@ -1,10 +1,14 @@
 import requests
 import json
+import ssl
+import logging
 from urllib3.exceptions import InsecureRequestWarning
 from urllib3 import disable_warnings
 
 # Disable SSL warnings for self-signed certificates
 disable_warnings(InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
 
 class ProxmoxAPI:
     """Proxmox VE API Client"""
@@ -21,8 +25,20 @@ class ProxmoxAPI:
         self.csrf_token = None
         
     def authenticate(self):
-        """Authenticate with Proxmox API"""
+        """Authenticate with Proxmox API with session management"""
         try:
+            # Check if we already have a valid session
+            if self.ticket and self.csrf_token:
+                # Test if current session is still valid
+                try:
+                    test_url = f"{self.base_url}/version"
+                    headers = self._get_headers()
+                    response = requests.get(test_url, headers=headers, verify=self.ssl_verify, timeout=10)
+                    if response.status_code == 200:
+                        return True
+                except:
+                    pass  # Session expired, need to re-authenticate
+            
             url = f"{self.base_url}/access/ticket"
             data = {
                 'username': f"{self.username}@{self.realm}",
@@ -59,7 +75,7 @@ class ProxmoxAPI:
         return {}
     
     def get_nodes(self):
-        """Get list of Proxmox nodes"""
+        """Get list of Proxmox nodes with enhanced error handling"""
         try:
             if not self.authenticate():
                 return []
@@ -77,8 +93,19 @@ class ProxmoxAPI:
             result = response.json()
             return result.get('data', [])
             
+        except requests.exceptions.SSLError as e:
+            logger.error(f"SSL Error connecting to Proxmox: {e}")
+            logger.info("Consider setting PROXMOX_SSL_VERIFY=False in your environment if using self-signed certificates")
+            return []
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection Error to Proxmox: {e}")
+            logger.info("Check that Proxmox host is reachable and port is correct")
+            return []
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Timeout connecting to Proxmox: {e}")
+            return []
         except Exception as e:
-            print(f"Failed to get nodes: {e}")
+            logger.error(f"Failed to get nodes: {e}")
             return []
     
     def get_containers(self, node=''):

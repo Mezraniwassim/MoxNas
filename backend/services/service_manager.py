@@ -8,6 +8,7 @@ import os
 import subprocess
 import configparser
 import logging
+import shutil
 from pathlib import Path
 from django.conf import settings
 
@@ -306,3 +307,192 @@ class SystemInfoManager:
         except Exception as e:
             logger.error(f"Failed to get system stats: {e}")
             return {}
+
+
+class FTPManager:
+    """Manages FTP/VSFTPD configuration and shares"""
+    
+    def __init__(self):
+        self.config_file = Path('/etc/vsftpd.conf')
+        self.service_manager = ServiceManager()
+    
+    def configure_ftp(self, anonymous_enable=True, local_enable=True, write_enable=True, **kwargs):
+        """Configure FTP server settings"""
+        try:
+            # Backup original config if it exists
+            if self.config_file.exists():
+                backup_file = self.config_file.with_suffix('.conf.backup')
+                if not backup_file.exists():
+                    shutil.copy2(self.config_file, backup_file)
+            
+            # Read existing configuration
+            config_lines = []
+            if self.config_file.exists():
+                with open(self.config_file, 'r') as f:
+                    config_lines = f.readlines()
+            
+            # Configuration settings to apply
+            config_settings = {
+                'anonymous_enable': 'YES' if anonymous_enable else 'NO',
+                'local_enable': 'YES' if local_enable else 'NO',
+                'write_enable': 'YES' if write_enable else 'NO',
+                'anon_upload_enable': 'YES' if anonymous_enable and write_enable else 'NO',
+                'anon_mkdir_write_enable': 'YES' if anonymous_enable and write_enable else 'NO',
+                'anon_root': '/mnt/storage',
+                'pasv_enable': 'YES',
+                'pasv_min_port': '40000',
+                'pasv_max_port': '50000',
+                'seccomp_sandbox': 'NO',  # Required for LXC containers
+                'allow_writeable_chroot': 'YES'
+            }
+            
+            # Add additional kwargs to config
+            config_settings.update(kwargs)
+            
+            # Update configuration
+            updated_lines = []
+            settings_added = set()
+            
+            for line in config_lines:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    updated_lines.append(line)
+                    continue
+                
+                if '=' in line:
+                    key = line.split('=')[0].strip()
+                    if key in config_settings:
+                        updated_lines.append(f"{key}={config_settings[key]}")
+                        settings_added.add(key)
+                    else:
+                        updated_lines.append(line)
+                else:
+                    updated_lines.append(line)
+            
+            # Add any new settings
+            for key, value in config_settings.items():
+                if key not in settings_added:
+                    updated_lines.append(f"{key}={value}")
+            
+            # Write updated configuration
+            with open(self.config_file, 'w') as f:
+                for line in updated_lines:
+                    f.write(line + '\n')
+            
+            logger.info("FTP configuration updated")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to configure FTP: {e}")
+            return False
+    
+    def create_ftp_user(self, username, password, home_dir=None):
+        """Create FTP user with home directory"""
+        try:
+            if home_dir is None:
+                home_dir = f"/mnt/storage/ftp_users/{username}"
+            
+            # Create home directory
+            os.makedirs(home_dir, exist_ok=True)
+            
+            # Create user account
+            result = subprocess.run([
+                'useradd', '-d', home_dir, '-s', '/bin/bash', username
+            ], capture_output=True, text=True)
+            
+            if result.returncode != 0 and 'already exists' not in result.stderr:
+                logger.error(f"Failed to create user {username}: {result.stderr}")
+                return False
+            
+            # Set password
+            result = subprocess.run([
+                'chpasswd'
+            ], input=f"{username}:{password}\n", text=True, capture_output=True)
+            
+            if result.returncode != 0:
+                logger.error(f"Failed to set password for {username}: {result.stderr}")
+                return False
+            
+            # Set proper ownership and permissions
+            subprocess.run(['chown', '-R', f"{username}:{username}", home_dir])
+            subprocess.run(['chmod', '755', home_dir])
+            
+            logger.info(f"FTP user {username} created with home directory {home_dir}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to create FTP user {username}: {e}")
+            return False
+    
+    def delete_ftp_user(self, username):
+        """Delete FTP user and home directory"""
+        try:
+            # Remove user
+            result = subprocess.run([
+                'userdel', '-r', username
+            ], capture_output=True, text=True)
+            
+            if result.returncode != 0 and 'does not exist' not in result.stderr:
+                logger.error(f"Failed to delete user {username}: {result.stderr}")
+                return False
+            
+            logger.info(f"FTP user {username} deleted")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete FTP user {username}: {e}")
+            return False
+    
+    def set_ftp_permissions(self, path, read_only=False):
+        """Set FTP permissions for a directory"""
+        try:
+            if not os.path.exists(path):
+                os.makedirs(path, exist_ok=True)
+            
+            if read_only:
+                # Set read-only permissions
+                subprocess.run(['chmod', '555', path])
+            else:
+                # Set read-write permissions
+                subprocess.run(['chmod', '755', path])
+            
+            logger.info(f"FTP permissions set for {path} (read_only: {read_only})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to set FTP permissions for {path}: {e}")
+            return False
+    
+    def get_ftp_status(self):
+        """Get FTP service status and configuration"""
+        try:
+            # Check service status
+            service_status = 'running' if self.service_manager.is_service_running('vsftpd') else 'stopped'
+            
+            # Read configuration
+            config = {}
+            if self.config_file.exists():
+                with open(self.config_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            config[key.strip()] = value.strip()
+            
+            return {
+                'service_status': service_status,
+                'configuration': config,
+                'config_file': str(self.config_file)
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get FTP status: {e}")
+            return {'error': str(e)}
+    
+    def restart_ftp_service(self):
+        """Restart FTP service"""
+        try:
+            return self.service_manager.restart_service('vsftpd')
+        except Exception as e:
+            logger.error(f"Failed to restart FTP service: {e}")
+            return False

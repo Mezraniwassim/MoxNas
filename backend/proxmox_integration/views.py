@@ -624,6 +624,35 @@ class ProxmoxStorageViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
+class ProxmoxTaskViewSet(viewsets.ModelViewSet):
+    """Manage Proxmox tasks"""
+    queryset = ProxmoxTask.objects.all()
+    
+    def list(self, request):
+        tasks = self.get_queryset()
+        data = [
+            {
+                'id': task.id,
+                'host': task.host.name,
+                'node': task.node.name,
+                'task_id': task.task_id,
+                'upid': task.upid,
+                'type': task.type,
+                'status': task.status,
+                'user': task.user,
+                'description': task.description,
+                'progress': task.progress,
+                'starttime': task.starttime.isoformat(),
+                'endtime': task.endtime.isoformat() if task.endtime else None,
+                'vmid': task.vmid,
+                'created_at': task.created_at.isoformat(),
+                'updated_at': task.updated_at.isoformat(),
+            } for task in tasks
+        ]
+        return Response(data)
+
+
 @csrf_exempt
 @api_view(['POST'])
 def connect_proxmox(request):
@@ -949,4 +978,66 @@ def monitoring_status(request):
             'success': False,
             'error': str(e),
             'timestamp': time.time()
+        }, status=500)
+
+
+@api_view(['GET'])
+def get_realtime_data(request):
+    """Get real-time monitoring data"""
+    try:
+        aggregator = get_realtime_aggregator()
+        data = aggregator.get_cached_data()
+        
+        if data:
+            return Response({
+                'success': True,
+                'data': data,
+                'last_update': aggregator.get_last_update().isoformat() if aggregator.get_last_update() else None
+            })
+        else:
+            return Response({
+                'success': False,
+                'message': 'No real-time data available',
+                'data': None
+            })
+            
+    except Exception as e:
+        logger.error(f"Error getting real-time data: {e}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['POST'])
+def start_realtime_monitoring_view(request):
+    """Start real-time monitoring"""
+    try:
+        start_realtime_monitoring()
+        return Response({
+            'success': True,
+            'message': 'Real-time monitoring started'
+        })
+    except Exception as e:
+        logger.error(f"Error starting real-time monitoring: {e}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['POST'])
+def stop_realtime_monitoring_view(request):
+    """Stop real-time monitoring"""
+    try:
+        stop_realtime_monitoring()
+        return Response({
+            'success': True,
+            'message': 'Real-time monitoring stopped'
+        })
+    except Exception as e:
+        logger.error(f"Error stopping real-time monitoring: {e}")
+        return Response({
+            'success': False,
+            'error': str(e)
         }, status=500)
