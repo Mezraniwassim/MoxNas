@@ -102,12 +102,25 @@ class SambaManager:
     def create_share(self, share_name, path, read_only=False, guest_ok=False, **kwargs):
         """Create a new SMB share"""
         try:
-            # Ensure directory exists
-            os.makedirs(path, exist_ok=True)
+            # Validate and normalize path
+            path = os.path.abspath(path)
             
-            # Read existing config
-            config = configparser.ConfigParser()
-            config.read(self.config_file)
+            # Ensure directory exists with proper permissions
+            os.makedirs(path, exist_ok=True)
+            os.chmod(path, 0o755)
+            
+            # Backup existing config
+            if self.config_file.exists():
+                backup_file = self.config_file.with_suffix('.conf.backup')
+                if not backup_file.exists():
+                    import shutil
+                    shutil.copy2(self.config_file, backup_file)
+            
+            # Read existing config with proper handling
+            config = configparser.ConfigParser(allow_no_value=True)
+            config.optionxform = str  # Preserve case
+            if self.config_file.exists():
+                config.read(self.config_file)
             
             # Add new share section
             section_name = share_name
@@ -118,15 +131,25 @@ class SambaManager:
             config.set(section_name, 'browseable', 'yes')
             config.set(section_name, 'writable', 'no' if read_only else 'yes')
             config.set(section_name, 'guest ok', 'yes' if guest_ok else 'no')
+            config.set(section_name, 'read only', 'yes' if read_only else 'no')
             config.set(section_name, 'create mask', '0664')
             config.set(section_name, 'directory mask', '0775')
+            config.set(section_name, 'force create mode', '0664')
+            config.set(section_name, 'force directory mode', '0775')
             
-            # Write config back
+            # Write config back with proper formatting
             with open(self.config_file, 'w') as f:
                 config.write(f)
             
-            # Restart samba
+            # Test samba configuration before restarting
+            result = subprocess.run(['testparm', '-s'], capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"Samba config test failed: {result.stderr}")
+            
+            # Restart samba services
             self.service_manager.restart_service('smbd')
+            self.service_manager.restart_service('nmbd')
+            
             logger.info(f"SMB share '{share_name}' created at {path}")
             return True
             
@@ -165,8 +188,12 @@ class NFSManager:
     def create_export(self, path, read_only=False, sync=True, **kwargs):
         """Create a new NFS export"""
         try:
-            # Ensure directory exists
+            # Validate and normalize path
+            path = os.path.abspath(path)
+            
+            # Ensure directory exists with proper permissions
             os.makedirs(path, exist_ok=True)
+            os.chmod(path, 0o755)
             
             # Build export options
             options = []
@@ -180,11 +207,18 @@ class NFSManager:
             else:
                 options.append('async')
             
-            options.extend(['no_subtree_check', 'no_root_squash'])
+            options.extend(['no_subtree_check', 'no_root_squash', 'insecure'])
             options_str = ','.join(options)
             
-            # Create export line
-            export_line = f"{path} *(rw,{options_str})\n"
+            # Create export line with proper formatting
+            export_line = f"{path} *({options_str})\n"
+            
+            # Backup existing exports
+            if self.exports_file.exists():
+                backup_file = self.exports_file.with_suffix('.backup')
+                if not backup_file.exists():
+                    import shutil
+                    shutil.copy2(self.exports_file, backup_file)
             
             # Read existing exports
             existing_exports = []
@@ -192,20 +226,34 @@ class NFSManager:
                 with open(self.exports_file, 'r') as f:
                     existing_exports = f.readlines()
             
-            # Check if export already exists
-            path_exists = any(line.startswith(str(path) + ' ') for line in existing_exports)
+            # Check if export already exists and remove old entry
+            filtered_exports = [line for line in existing_exports 
+                              if not line.strip().startswith(str(path) + ' ')]
             
-            if not path_exists:
-                # Add new export
-                with open(self.exports_file, 'a') as f:
-                    f.write(export_line)
-                
-                # Reload exports
-                subprocess.run(['exportfs', '-ra'], check=True)
-                logger.info(f"NFS export created for {path}")
-                return True
+            # Add new export
+            filtered_exports.append(export_line)
             
-            return True  # Already exists
+            # Write all exports back
+            with open(self.exports_file, 'w') as f:
+                f.writelines(filtered_exports)
+            
+            # Ensure proper ownership and permissions
+            os.chown(self.exports_file, 0, 0)  # root:root
+            os.chmod(self.exports_file, 0o644)
+            
+            # Reload exports with error handling
+            try:
+                subprocess.run(['exportfs', '-ra'], check=True, timeout=10)
+            except subprocess.TimeoutExpired:
+                logger.warning("NFS export reload timed out")
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"NFS export reload failed: {e}")
+            
+            # Restart NFS service to ensure changes take effect
+            self.service_manager.restart_service('nfs-kernel-server')
+            
+            logger.info(f"NFS export created for {path}")
+            return True
             
         except Exception as e:
             logger.error(f"Failed to create NFS export for {path}: {e}")
@@ -319,6 +367,11 @@ class FTPManager:
     def configure_ftp(self, anonymous_enable=True, local_enable=True, write_enable=True, **kwargs):
         """Configure FTP server settings"""
         try:
+            # Ensure FTP root directory exists
+            ftp_root = '/mnt/storage'
+            os.makedirs(ftp_root, exist_ok=True)
+            os.chmod(ftp_root, 0o755)
+            
             # Backup original config if it exists
             if self.config_file.exists():
                 backup_file = self.config_file.with_suffix('.conf.backup')
@@ -338,12 +391,21 @@ class FTPManager:
                 'write_enable': 'YES' if write_enable else 'NO',
                 'anon_upload_enable': 'YES' if anonymous_enable and write_enable else 'NO',
                 'anon_mkdir_write_enable': 'YES' if anonymous_enable and write_enable else 'NO',
-                'anon_root': '/mnt/storage',
+                'anon_root': ftp_root,
+                'anon_other_write_enable': 'YES' if anonymous_enable and write_enable else 'NO',
                 'pasv_enable': 'YES',
                 'pasv_min_port': '40000',
                 'pasv_max_port': '50000',
                 'seccomp_sandbox': 'NO',  # Required for LXC containers
-                'allow_writeable_chroot': 'YES'
+                'allow_writeable_chroot': 'YES',
+                'listen': 'YES',
+                'listen_ipv6': 'NO',
+                'dirmessage_enable': 'YES',
+                'use_localtime': 'YES',
+                'xferlog_enable': 'YES',
+                'connect_from_port_20': 'YES',
+                'chroot_local_user': 'NO',  # Don't chroot to avoid path issues
+                'secure_chroot_dir': '/var/run/vsftpd/empty'
             }
             
             # Add additional kwargs to config
@@ -378,6 +440,11 @@ class FTPManager:
             with open(self.config_file, 'w') as f:
                 for line in updated_lines:
                     f.write(line + '\n')
+            
+            # Ensure vsftpd secure directory exists
+            secure_dir = '/var/run/vsftpd/empty'
+            os.makedirs(secure_dir, exist_ok=True)
+            os.chmod(secure_dir, 0o755)
             
             logger.info("FTP configuration updated")
             return True

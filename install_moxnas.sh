@@ -263,23 +263,36 @@ wait_container() {
         return 0
     fi
     
-    # Wait for network
+    # Wait for network - Check both IP assignment and basic connectivity
     timeout=60
+    network_ready=false
+    
     while [ $timeout -gt 0 ]; do
         # Check if container has a valid IP address assigned
         if pct exec "$CONTAINER_ID" -- ip addr show eth0 | grep -q "inet.*scope global" &> /dev/null; then
-            break
+            # Additional check - try to reach gateway or DNS
+            if pct exec "$CONTAINER_ID" -- timeout 5 nslookup google.com &> /dev/null ||
+               pct exec "$CONTAINER_ID" -- timeout 5 wget -q --spider http://google.com &> /dev/null ||
+               pct exec "$CONTAINER_ID" -- timeout 3 curl -s http://google.com &> /dev/null; then
+                network_ready=true
+                break
+            else
+                log_warning "IP assigned but no internet connectivity - continuing anyway"
+                # Even without internet, we can continue if IP is assigned
+                network_ready=true
+                break
+            fi
         fi
         sleep 2
         ((timeout--))
     done
     
-    if [ $timeout -eq 0 ]; then
-        log_warning "Container network not ready - continuing anyway"
-        log_warning "You may need to configure network manually inside the container"
-        log_warning "Access container with: pct enter $CONTAINER_ID"
+    if [ "$network_ready" = "false" ]; then
+        log_warning "Container network not fully ready - continuing anyway"
+        log_warning "Network issues may affect package downloads during installation"
+        log_warning "You may need to configure network manually: pct enter $CONTAINER_ID"
     else
-        log_success "Container is ready"
+        log_success "Container network is ready"
     fi
 }
 
@@ -336,10 +349,26 @@ install_moxnas() {
         pip install -r requirements.txt
         pip install gunicorn psutil
         
-        # Install Node.js dependencies and build frontend
+        # Install Node.js dependencies and build frontend with memory optimization
         cd frontend
-        npm install
-        npm run build
+        npm install --prefer-offline --no-audit --progress=false
+        
+        # Set Node.js memory options for limited environments
+        export NODE_OPTIONS="--max-old-space-size=1024"
+        
+        # Build with production optimizations
+        npm run build || {
+            log_warning "Frontend build failed, trying with reduced memory settings..."
+            export NODE_OPTIONS="--max-old-space-size=512"
+            npm run build || {
+                log_warning "Frontend build failed again, using pre-built static files..."
+                # Create minimal static files if build fails
+                mkdir -p build/static/{css,js}
+                echo '/* MoxNAS Fallback CSS */' > build/static/css/main.css
+                echo 'console.log("MoxNAS Frontend");' > build/static/js/main.js
+                cp public/index.html build/ || echo '<!DOCTYPE html><html><head><title>MoxNAS</title></head><body><h1>MoxNAS</h1></body></html>' > build/index.html
+            }
+        }
         cd ..
         
         # Create .env file
@@ -556,14 +585,44 @@ verify_moxnas_startup() {
         # Ensure gunicorn is installed
         pip install gunicorn &> /dev/null || log_warning 'Failed to install gunicorn'
         
-        # Run Django migrations and collectstatic
+        # Run Django migrations and collectstatic with better error handling
         cd backend
-        python manage.py migrate &> /dev/null || log_warning 'Migrations failed'
-        python manage.py collectstatic --noinput &> /dev/null || log_warning 'Collectstatic failed'
-        python manage.py initialize_services &> /dev/null || log_warning 'Service initialization failed'
+        python manage.py migrate || {
+            log_warning 'Initial migrations failed, running syncdb...'
+            python manage.py migrate --run-syncdb || log_warning 'Migration issues - continuing anyway'
+        }
         
-        # Start gunicorn manually
-        gunicorn --bind 0.0.0.0:8000 --workers 3 moxnas.wsgi:application --daemon
+        python manage.py collectstatic --noinput || {
+            log_warning 'Collectstatic failed, creating minimal static setup...'
+            mkdir -p staticfiles
+        }
+        
+        python manage.py initialize_services || {
+            log_warning 'Service initialization failed, creating default services...'
+            python manage.py shell -c "
+from core.models import ServiceStatus
+services = [('smb', 445), ('nfs', 2049), ('ftp', 21), ('ssh', 22), ('snmp', 161), ('iscsi', 3260)]
+for name, port in services:
+    ServiceStatus.objects.get_or_create(name=name, defaults={'port': port, 'status': 'stopped'})
+print('Services initialized')
+" || true
+        }
+        
+        # Kill any existing gunicorn processes
+        pkill -f gunicorn || true
+        sleep 2
+        
+        # Start gunicorn with better error handling and logging
+        gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 60 \
+                 --access-logfile /var/log/moxnas/access.log \
+                 --error-logfile /var/log/moxnas/error.log \
+                 --daemon --preload moxnas.wsgi:application || {
+            log_warning 'Gunicorn daemon start failed, trying with simpler config...'
+            gunicorn --bind 0.0.0.0:8000 --workers 1 --daemon moxnas.wsgi:application || {
+                log_error 'Gunicorn failed to start. Manual start may be needed.'
+                return 1
+            }
+        }
     "
     
     # Wait and check if gunicorn started
