@@ -47,20 +47,43 @@ check_nodejs_version() {
             
             if [ \"\$MAJOR_VERSION\" -lt 14 ]; then
                 echo 'Node.js version is too old (\$NODE_VERSION). Installing Node.js 18...'
+                
+                # Remove conflicting packages first
+                apt-get remove -y nodejs nodejs-doc libnode-dev npm || true
+                apt-get autoremove -y || true
+                
+                # Add NodeSource repository and install Node.js 18
                 curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
                 apt-get install -y nodejs
+                
+                # Install npm separately if not included
+                if ! command -v npm >/dev/null 2>&1; then
+                    apt-get install -y npm || curl -L https://www.npmjs.com/install.sh | sh
+                fi
             else
                 echo 'Node.js version \$NODE_VERSION is compatible'
             fi
         else
             echo 'Node.js not found. Installing Node.js 18...'
+            
+            # Remove any existing Node.js packages
+            apt-get remove -y nodejs nodejs-doc libnode-dev npm || true
+            apt-get autoremove -y || true
+            
+            # Install Node.js 18
             curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
             apt-get install -y nodejs
+            
+            # Install npm if not included
+            if ! command -v npm >/dev/null 2>&1; then
+                apt-get install -y npm || curl -L https://www.npmjs.com/install.sh | sh
+            fi
         fi
         
         # Verify installation
-        node --version
-        npm --version
+        echo 'Final Node.js and npm versions:'
+        node --version || echo 'Node.js not available'
+        npm --version || echo 'npm not available'
     "
 }
 
@@ -418,39 +441,85 @@ install_moxnas() {
         pip install -r requirements.txt
         pip install gunicorn psutil
         
-        # Install Node.js dependencies and build frontend with memory optimization
+        # Install Node.js dependencies and build frontend - BOTH FRONTEND AND BACKEND MUST WORK
         cd frontend
         
-        # Check Node.js version before building
+        # Ensure Node.js is properly installed before building
+        if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+            echo \"Node.js or npm not found, installing Node.js 18...\"
+            cd /opt/moxnas
+            
+            # Remove conflicting packages
+            apt-get remove -y nodejs nodejs-doc libnode-dev npm || true
+            apt-get autoremove -y || true
+            
+            # Install Node.js 18
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            apt-get install -y nodejs
+            
+            cd frontend
+        fi
+        
+        # Check Node.js version and upgrade if too old
         NODE_VERSION=\$(node --version | cut -d'v' -f2)
         MAJOR_VERSION=\$(echo \$NODE_VERSION | cut -d'.' -f1)
         
         if [ \"\$MAJOR_VERSION\" -lt 14 ]; then
-            echo \"ERROR: Node.js version \$NODE_VERSION is too old. Please update to version 14 or higher.\"
-            exit 1
+            echo \"Node.js version \$NODE_VERSION is too old, upgrading to Node.js 18...\"
+            cd /opt/moxnas
+            
+            # Remove old Node.js
+            apt-get remove -y nodejs nodejs-doc libnode-dev npm || true
+            apt-get autoremove -y || true
+            
+            # Install Node.js 18
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            apt-get install -y nodejs
+            
+            cd frontend
+            
+            # Verify new version
+            NODE_VERSION=\$(node --version | cut -d'v' -f2)
+            MAJOR_VERSION=\$(echo \$NODE_VERSION | cut -d'.' -f1)
+            echo \"Updated to Node.js version \$NODE_VERSION\"
         fi
         
         echo \"Using Node.js version \$NODE_VERSION\"
         
-        # Install packages with proper options for the Node version
-        npm install --prefer-offline --no-audit --progress=false --legacy-peer-deps
-        
-        # Set Node.js memory options for limited environments
-        export NODE_OPTIONS="--max-old-space-size=1024"
-        
-        # Build with production optimizations
-        npm run build || {
-            echo "WARNING: Frontend build failed, trying with reduced memory settings..."
-            export NODE_OPTIONS="--max-old-space-size=512"
-            npm run build || {
-                echo "WARNING: Frontend build failed again, using pre-built static files..."
-                # Create minimal static files if build fails
-                mkdir -p build/static/{css,js}
-                echo '/* MoxNAS Fallback CSS */' > build/static/css/main.css
-                echo 'console.log("MoxNAS Frontend");' > build/static/js/main.js
-                cp public/index.html build/ || echo '<!DOCTYPE html><html><head><title>MoxNAS</title></head><body><h1>MoxNAS</h1></body></html>' > build/index.html
+        # Install npm packages with proper error handling
+        echo \"Installing npm packages...\"
+        npm install --prefer-offline --no-audit --progress=false --legacy-peer-deps || {
+            echo \"npm install failed, trying with cache clean...\"
+            npm cache clean --force
+            npm install --prefer-offline --no-audit --progress=false --legacy-peer-deps || {
+                echo \"npm install still failing, trying basic install...\"
+                npm install --no-audit --progress=false || {
+                    echo \"CRITICAL: npm install failed completely - frontend will not work\"
+                    echo \"Manual fix required: pct exec \$CONTAINER_ID -- bash -c 'cd /opt/moxnas/frontend && npm install'\"
+                    exit 1
+                }
             }
         }
+        
+        # Set Node.js memory options for limited environments
+        export NODE_OPTIONS=\"--max-old-space-size=1024\"
+        
+        # Build frontend with fallback options
+        echo \"Building frontend...\"
+        npm run build || {
+            echo \"Frontend build failed, trying with reduced memory...\"
+            export NODE_OPTIONS=\"--max-old-space-size=512\"
+            npm run build || {
+                echo \"Frontend build failed again, trying development build...\"
+                npm run build:dev || {
+                    echo \"CRITICAL: Frontend build failed completely\"
+                    echo \"Manual fix required: pct exec \$CONTAINER_ID -- bash -c 'cd /opt/moxnas/frontend && npm run build'\"
+                    exit 1
+                }
+            }
+        }
+        
+        echo \"Frontend build completed successfully\"
         cd ..
         
         # Create .env file
@@ -502,6 +571,11 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
         
+        # Set proper permissions for systemd service file
+        chmod 644 /etc/systemd/system/moxnas.service
+        chown root:root /etc/systemd/system/moxnas.service
+        
+        # Reload systemd and enable service
         systemctl daemon-reload
         systemctl enable moxnas
     "
