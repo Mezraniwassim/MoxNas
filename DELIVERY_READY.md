@@ -32,6 +32,13 @@ The MoxNAS project has been comprehensively reviewed and all major issues have b
 - **Solution:** Fixed path handling, permissions, and configuration files
 - **Files Modified:** `backend/services/service_manager.py`
 
+### 5. **Installation Script Syntax Error** ✅ **JUST FIXED**
+
+- **Problem:** Bash syntax error on line 604 causing installation failure
+- **Solution:** Fixed unmatched quote in bash command structure
+- **Files Modified:** `install_moxnas.sh` (line 631)
+- **Status:** ✅ **RESOLVED** - Installation now works properly
+
 ---
 
 ## 📋 **Installation Commands**
