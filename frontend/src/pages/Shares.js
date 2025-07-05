@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Table, Modal, Form, Badge, Nav, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Table, Form, Badge, Nav, Alert, Modal } from 'react-bootstrap';
 import { FaFolderOpen, FaPlus, FaEdit, FaTrash, FaNetworkWired, FaUpload, FaCloud, FaSync, FaPlay } from 'react-icons/fa';
 import { storageAPI, servicesAPI } from '../services/api';
 
@@ -22,15 +22,33 @@ const Shares = () => {
 
   const loadData = async () => {
     try {
-      const [sharesResponse, cloudResponse, rsyncResponse] = await Promise.all([
+      const [sharesResponse, cloudResponse, rsyncResponse] = await Promise.allSettled([
         storageAPI.getShares(),
         servicesAPI.getCloudSyncTasks(),
         servicesAPI.getRsyncTasks()
       ]);
       
-      setShares(sharesResponse.data);
-      setCloudTasks(cloudResponse.data.results || cloudResponse.data);
-      setRsyncTasks(rsyncResponse.data.results || rsyncResponse.data);
+      if (sharesResponse.status === 'fulfilled') {
+        setShares(sharesResponse.value.data);
+      } else {
+        console.error('Failed to load shares:', sharesResponse.reason);
+        setShares([]);
+      }
+      
+      if (cloudResponse.status === 'fulfilled') {
+        setCloudTasks(cloudResponse.value.data.results || cloudResponse.value.data);
+      } else {
+        console.error('Failed to load cloud sync tasks:', cloudResponse.reason);
+        setCloudTasks([]);
+      }
+      
+      if (rsyncResponse.status === 'fulfilled') {
+        setRsyncTasks(rsyncResponse.value.data.results || rsyncResponse.value.data);
+      } else {
+        console.error('Failed to load rsync tasks:', rsyncResponse.reason);
+        setRsyncTasks([]);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -181,83 +199,183 @@ const Shares = () => {
       handleSaveShare(formData);
     };
 
+    const handleClose = () => {
+      setShowShareModal(false);
+    };
+    
+    if (!showShareModal) {
+      return null;
+    }
+
     return (
-      <Modal show={showShareModal} onHide={() => setShowShareModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>{editingShare ? 'Edit Share' : 'Add New Share'}</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Share Name</Form.Label>
-              <Form.Control
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Path</Form.Label>
-              <Form.Control
-                type="text"
-                value={formData.path}
-                onChange={(e) => setFormData({...formData, path: e.target.value})}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Protocol</Form.Label>
-              <Form.Select
-                value={formData.protocol}
-                onChange={(e) => setFormData({...formData, protocol: e.target.value})}
-                required
+      <>
+        {/* Backdrop */}
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 9998,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={handleClose}
+        >
+          {/* Modal */}
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '90%',
+              overflow: 'auto',
+              zIndex: 9999
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              padding: '20px', 
+              borderBottom: '1px solid #dee2e6',
+              position: 'relative',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h4 style={{ margin: 0 }}>{editingShare ? 'Edit Share' : 'Add New Share'}</h4>
+              <button 
+                onClick={handleClose}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
               >
-                <option value="smb">SMB/CIFS</option>
-                <option value="nfs">NFS</option>
-                <option value="ftp">FTP</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-              />
-            </Form.Group>
-            <Form.Check
-              className="mb-2"
-              type="checkbox"
-              label="Read-only access"
-              checked={formData.read_only}
-              onChange={(e) => setFormData({...formData, read_only: e.target.checked})}
-            />
-            <Form.Check
-              className="mb-2"
-              type="checkbox"
-              label="Allow guest access"
-              checked={formData.guest_ok}
-              onChange={(e) => setFormData({...formData, guest_ok: e.target.checked})}
-            />
-            <Form.Check
-              type="checkbox"
-              label="Enabled"
-              checked={formData.enabled}
-              onChange={(e) => setFormData({...formData, enabled: e.target.checked})}
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowShareModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit">
-              {editingShare ? 'Update' : 'Create'} Share
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div style={{ padding: '20px' }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Share Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Path</label>
+                  <input
+                    type="text"
+                    value={formData.path}
+                    onChange={(e) => setFormData({...formData, path: e.target.value})}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Protocol</label>
+                  <select
+                    value={formData.protocol}
+                    onChange={(e) => setFormData({...formData, protocol: e.target.value})}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    <option value="smb">SMB/CIFS</option>
+                    <option value="nfs">NFS</option>
+                    <option value="ftp">FTP</option>
+                  </select>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Description</label>
+                  <textarea
+                    rows={2}
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.read_only}
+                      onChange={(e) => setFormData({...formData, read_only: e.target.checked})}
+                      style={{ marginRight: '0.5rem' }}
+                    />
+                    Read-only access
+                  </label>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.guest_ok}
+                      onChange={(e) => setFormData({...formData, guest_ok: e.target.checked})}
+                      style={{ marginRight: '0.5rem' }}
+                    />
+                    Allow guest access
+                  </label>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.enabled}
+                      onChange={(e) => setFormData({...formData, enabled: e.target.checked})}
+                      style={{ marginRight: '0.5rem' }}
+                    />
+                    Enabled
+                  </label>
+                </div>
+              </div>
+              <div style={{ 
+                padding: '20px', 
+                borderTop: '1px solid #dee2e6',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px'
+              }}>
+                <Button variant="secondary" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button variant="primary" type="submit">
+                  {editingShare ? 'Update' : 'Create'} Share
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </>
     );
   };
 
@@ -653,6 +771,7 @@ const Shares = () => {
     );
   };
 
+  
   if (loading) {
     return (
       <Container>

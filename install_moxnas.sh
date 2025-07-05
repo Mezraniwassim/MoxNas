@@ -440,7 +440,9 @@ install_moxnas() {
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install gunicorn psutil
-        
+
+
+
         # Install Node.js dependencies and build frontend - BOTH FRONTEND AND BACKEND MUST WORK
         cd frontend
         
