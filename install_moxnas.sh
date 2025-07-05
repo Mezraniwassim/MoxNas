@@ -599,13 +599,19 @@ verify_moxnas_startup() {
         
         python manage.py initialize_services || {
             log_warning 'Service initialization failed, creating default services...'
-            python manage.py shell -c "
+            python manage.py shell << 'PYTHON_EOF'
 from core.models import ServiceStatus
-services = [('smb', 445), ('nfs', 2049), ('ftp', 21), ('ssh', 22), ('snmp', 161), ('iscsi', 3260)]
+services = [
+    ('smb', 445), ('nfs', 2049), ('ftp', 21), 
+    ('ssh', 22), ('snmp', 161), ('iscsi', 3260)
+]
 for name, port in services:
-    ServiceStatus.objects.get_or_create(name=name, defaults={'port': port, 'status': 'stopped'})
+    ServiceStatus.objects.get_or_create(
+        name=name, 
+        defaults={'port': port, 'status': 'stopped'}
+    )
 print('Services initialized')
-" || true
+PYTHON_EOF
         }
         
         # Kill any existing gunicorn processes
