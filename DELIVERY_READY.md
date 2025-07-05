@@ -39,6 +39,27 @@ The MoxNAS project has been comprehensively reviewed and all major issues have b
 - **Files Modified:** `install_moxnas.sh` (line 631)
 - **Status:** ✅ **RESOLVED** - Installation now works properly
 
+### 6. **Build Script and Node.js Compatibility Issues** ✅ **JUST FIXED**
+
+- **Problem:** Build script syntax error (line 25), Node.js v12.22.9 incompatibility, log_warning function calls in container context
+- **Solution:** Fixed bash command structure, added Node.js version checking/upgrade (>=14), replaced problematic function calls
+- **Files Modified:** `install_moxnas.sh` (multiple sections)
+- **Status:** ✅ **RESOLVED** - Build process now works with proper Node.js versions
+
+### 7. **Locale Configuration Warnings** ✅ **JUST FIXED**
+
+- **Problem:** Perl and locale warnings during package installation
+- **Solution:** Added proper locale generation and configuration (en_US.UTF-8)
+- **Files Modified:** `install_moxnas.sh` (system setup section)
+- **Status:** ✅ **RESOLVED** - No more locale warnings during installation
+
+### 8. **System Permission Issues** ✅ **JUST FIXED**
+
+- **Problem:** SNMP directory permission warnings and other system permission issues
+- **Solution:** Added comprehensive permission fixes for `/var/lib/snmp` and other service directories
+- **Files Modified:** `install_moxnas.sh` (configure_services function)
+- **Status:** ✅ **RESOLVED** - All service directories have proper permissions
+
 ---
 
 ## 📋 **Installation Commands**

@@ -37,6 +37,33 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Check Node.js version and install if needed
+check_nodejs_version() {
+    pct exec "$CONTAINER_ID" -- bash -c "
+        # Check if Node.js is installed and get version
+        if command -v node >/dev/null 2>&1; then
+            NODE_VERSION=\$(node --version | cut -d'v' -f2)
+            MAJOR_VERSION=\$(echo \$NODE_VERSION | cut -d'.' -f1)
+            
+            if [ \"\$MAJOR_VERSION\" -lt 14 ]; then
+                echo 'Node.js version is too old (\$NODE_VERSION). Installing Node.js 18...'
+                curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                apt-get install -y nodejs
+            else
+                echo 'Node.js version \$NODE_VERSION is compatible'
+            fi
+        else
+            echo 'Node.js not found. Installing Node.js 18...'
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            apt-get install -y nodejs
+        fi
+        
+        # Verify installation
+        node --version
+        npm --version
+    "
+}
+
 # Check if running on Proxmox
 check_proxmox() {
     if ! command -v pct &> /dev/null; then
@@ -321,6 +348,48 @@ install_moxnas() {
             build-essential
     "
     
+    # Check and upgrade Node.js version if needed
+    log_info "Checking Node.js version compatibility..."
+    check_nodejs_version
+    
+    # Configure locale to prevent warnings
+    log_info "Configuring system locale..."
+    pct exec "$CONTAINER_ID" -- bash -c "
+        export DEBIAN_FRONTEND=noninteractive
+        
+        # Install locales package if not present
+        apt-get install -y locales
+        
+        # Generate en_US.UTF-8 locale
+        locale-gen en_US.UTF-8
+        
+        # Set system locale
+        update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+        
+        # Export locale for current session
+        export LANG=en_US.UTF-8
+        export LC_ALL=en_US.UTF-8
+    "
+    
+    # Fix common permission issues
+    log_info "Setting up proper permissions and directories..."
+    pct exec "$CONTAINER_ID" -- bash -c "
+        # Create necessary directories with proper permissions
+        mkdir -p /var/lib/snmp /var/log/moxnas /etc/moxnas /mnt/storage
+        
+        # Fix directory permissions
+        chmod 755 /var/lib/snmp /var/log/moxnas /etc/moxnas /mnt/storage
+        
+        # Ensure proper ownership for service directories
+        if id snmp >/dev/null 2>&1; then
+            chown snmp:snmp /var/lib/snmp
+        fi
+        
+        # Set proper locale environment for all sessions
+        echo 'export LANG=en_US.UTF-8' >> /etc/environment
+        echo 'export LC_ALL=en_US.UTF-8' >> /etc/environment
+    "
+    
     # Install NAS services
     pct exec "$CONTAINER_ID" -- bash -c "
         export DEBIAN_FRONTEND=noninteractive
@@ -351,17 +420,30 @@ install_moxnas() {
         
         # Install Node.js dependencies and build frontend with memory optimization
         cd frontend
-        npm install --prefer-offline --no-audit --progress=false
+        
+        # Check Node.js version before building
+        NODE_VERSION=\$(node --version | cut -d'v' -f2)
+        MAJOR_VERSION=\$(echo \$NODE_VERSION | cut -d'.' -f1)
+        
+        if [ \"\$MAJOR_VERSION\" -lt 14 ]; then
+            echo \"ERROR: Node.js version \$NODE_VERSION is too old. Please update to version 14 or higher.\"
+            exit 1
+        fi
+        
+        echo \"Using Node.js version \$NODE_VERSION\"
+        
+        # Install packages with proper options for the Node version
+        npm install --prefer-offline --no-audit --progress=false --legacy-peer-deps
         
         # Set Node.js memory options for limited environments
         export NODE_OPTIONS="--max-old-space-size=1024"
         
         # Build with production optimizations
         npm run build || {
-            log_warning "Frontend build failed, trying with reduced memory settings..."
+            echo "WARNING: Frontend build failed, trying with reduced memory settings..."
             export NODE_OPTIONS="--max-old-space-size=512"
             npm run build || {
-                log_warning "Frontend build failed again, using pre-built static files..."
+                echo "WARNING: Frontend build failed again, using pre-built static files..."
                 # Create minimal static files if build fails
                 mkdir -p build/static/{css,js}
                 echo '/* MoxNAS Fallback CSS */' > build/static/css/main.css
@@ -486,6 +568,15 @@ EOF
     
     # Configure SNMP
     pct exec "$CONTAINER_ID" -- bash -c "
+        # Fix SNMP directory permissions
+        if [ -d /var/lib/snmp ]; then
+            chown snmp:snmp /var/lib/snmp
+            chmod 755 /var/lib/snmp
+        else
+            mkdir -p /var/lib/snmp
+            chown snmp:snmp /var/lib/snmp
+            chmod 755 /var/lib/snmp
+        fi
         systemctl enable snmpd
     "
     
