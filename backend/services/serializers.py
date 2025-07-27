@@ -22,7 +22,8 @@ class CloudSyncTaskSerializer(serializers.ModelSerializer):
         model = CloudSyncTask
         fields = '__all__'
         extra_kwargs = {
-            'credentials': {'write_only': True}  # Don't expose credentials in API
+            'credentials': {'write_only': True},  # Don't expose credentials in API
+            'created_by': {'required': False}
         }
 
 class RsyncTaskSerializer(serializers.ModelSerializer):
@@ -33,6 +34,9 @@ class RsyncTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = RsyncTask
         fields = '__all__'
+        extra_kwargs = {
+            'created_by': {'required': False}
+        }
 
 class TaskLogSerializer(serializers.ModelSerializer):
     task_type_display = serializers.CharField(source='get_task_type_display', read_only=True)

@@ -16,7 +16,7 @@ from .service_manager import ServiceManager, SambaManager, NFSManager, FTPManage
 class ServiceConfigViewSet(viewsets.ModelViewSet):
     queryset = ServiceConfig.objects.all()
     serializer_class = ServiceConfigSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
 class CloudSyncTaskViewSet(viewsets.ModelViewSet):
     queryset = CloudSyncTask.objects.all()
@@ -26,11 +26,21 @@ class CloudSyncTaskViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             permission_classes = []
         else:
-            permission_classes = [IsAuthenticated]
+            permission_classes = []
         return [permission() for permission in permission_classes]
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            if self.request.user.is_authenticated:
+                serializer.save(created_by=self.request.user)
+            else:
+                admin_user = User.objects.get(username="admin")
+                serializer.save(created_by=admin_user)
+        except User.DoesNotExist:
+            # Fallback to creating without user if admin doesn't exist
+            serializer.save()
 
 class RsyncTaskViewSet(viewsets.ModelViewSet):
     queryset = RsyncTask.objects.all()
@@ -40,24 +50,34 @@ class RsyncTaskViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             permission_classes = []
         else:
-            permission_classes = [IsAuthenticated]
+            permission_classes = []
         return [permission() for permission in permission_classes]
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            if self.request.user.is_authenticated:
+                serializer.save(created_by=self.request.user)
+            else:
+                admin_user = User.objects.get(username="admin")
+                serializer.save(created_by=admin_user)
+        except User.DoesNotExist:
+            # Fallback to creating without user if admin doesn't exist
+            serializer.save()
 
 class TaskLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = TaskLog.objects.all()
     serializer_class = TaskLogSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
 class UPSConfigViewSet(viewsets.ModelViewSet):
     queryset = UPSConfig.objects.all()
     serializer_class = UPSConfigSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def services_status(request):
     """Get status of all NAS services"""
     service_manager = ServiceManager()
@@ -136,28 +156,28 @@ def _manage_service(service_name, action):
         return {'success': False, 'message': f'Error: {str(e)}'}
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def start_service(request, service_name):
     """Start a NAS service"""
     result = _manage_service(service_name, 'start')
     return Response(result, status=status.HTTP_200_OK if result['success'] else status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def stop_service(request, service_name):
     """Stop a NAS service"""
     result = _manage_service(service_name, 'stop')
     return Response(result, status=status.HTTP_200_OK if result['success'] else status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def restart_service(request, service_name):
     """Restart a NAS service"""
     result = _manage_service(service_name, 'restart')
     return Response(result, status=status.HTTP_200_OK if result['success'] else status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def run_cloud_sync_task(request, pk):
     """Manually run a cloud sync task"""
     task = get_object_or_404(CloudSyncTask, pk=pk)
@@ -205,7 +225,7 @@ def run_cloud_sync_task(request, pk):
     return Response({'success': True, 'task_log_id': task_log.id})
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def configure_ftp(request):
     """Configure FTP service settings"""
     try:
@@ -231,7 +251,7 @@ def configure_ftp(request):
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def create_ftp_user(request):
     """Create a new FTP user"""
     try:
@@ -258,7 +278,7 @@ def create_ftp_user(request):
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def delete_ftp_user(request, username):
     """Delete an FTP user"""
     try:
@@ -276,7 +296,7 @@ def delete_ftp_user(request, username):
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([])
 def get_ftp_status(request):
     """Get FTP service status and configuration"""
     try:
