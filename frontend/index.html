@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoxNAS - Network Attached Storage</title>
+    <link rel="stylesheet" href="src/styles/truenas-theme.css">
+    <link rel="stylesheet" href="src/styles/truenas-components.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+</head>
+<body>
+    <div class="truenas-app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="truenas-sidebar">
+            <div class="truenas-sidebar-header">
+                <h2><i class="fas fa-server"></i> MoxNAS</h2>
+                <p class="truenas-version">v1.0.0</p>
+            </div>
+            
+            <ul class="truenas-nav-menu">
+                <li class="truenas-nav-item">
+                    <a href="#dashboard" class="truenas-nav-link active" data-page="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#storage" class="truenas-nav-link" data-page="storage">
+                        <i class="fas fa-hdd"></i>
+                        <span>Storage</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#shares" class="truenas-nav-link" data-page="shares">
+                        <i class="fas fa-share-alt"></i>
+                        <span>Shares</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#network" class="truenas-nav-link" data-page="network">
+                        <i class="fas fa-network-wired"></i>
+                        <span>Network</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#system" class="truenas-nav-link" data-page="system">
+                        <i class="fas fa-cogs"></i>
+                        <span>System</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#tasks" class="truenas-nav-link" data-page="tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Tasks</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#proxmox" class="truenas-nav-link" data-page="proxmox">
+                        <i class="fas fa-cubes"></i>
+                        <span>Proxmox</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="proxmox-setup.html" class="truenas-nav-link" target="_blank">
+                        <i class="fas fa-server"></i>
+                        <span>Proxmox Setup</span>
+                    </a>
+                </li>
+                <li class="truenas-nav-item">
+                    <a href="#reporting" class="truenas-nav-link" data-page="reporting">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reporting</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="truenas-sidebar-footer">
+                <div class="truenas-system-status">
+                    <span class="truenas-status-indicator"></span>
+                    <span>System Online</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="truenas-main-content">
+            <header class="truenas-header">
+                <div class="truenas-header-title">
+                    <h1 id="page-title">Dashboard</h1>
+                    <p id="page-subtitle">System Overview</p>
+                </div>
+                <div class="truenas-header-actions">
+                    <button class="truenas-btn truenas-btn-secondary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <div class="truenas-user-menu">
+                        <i class="fas fa-user-circle"></i>
+                        <span>Admin</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="truenas-page-content">
+                <!-- Dashboard Page -->
+                <div id="dashboard-page" class="page active">
+                    <div class="truenas-stats-grid">
+                        <div class="truenas-card">
+                            <div class="truenas-stat-icon">
+                                <i class="fas fa-hdd"></i>
+                            </div>
+                            <div class="truenas-stat-content">
+                                <h3>Storage Pools</h3>
+                                <p class="truenas-stat-number" id="storage-pools-count">0</p>
+                                <p class="truenas-stat-label">Active</p>
+                            </div>
+                        </div>
+                        
+                        <div class="truenas-card">
+                            <div class="truenas-stat-icon">
+                                <i class="fas fa-share-alt"></i>
+                            </div>
+                            <div class="truenas-stat-content">
+                                <h3>Shares</h3>
+                                <p class="truenas-stat-number" id="shares-count">0</p>
+                                <p class="truenas-stat-label">Configured</p>
+                            </div>
+                        </div>
+                        
+                        <div class="truenas-card">
+                            <div class="truenas-stat-icon">
+                                <i class="fas fa-memory"></i>
+                            </div>
+                            <div class="truenas-stat-content">
+                                <h3>Memory Usage</h3>
+                                <p class="truenas-stat-number" id="memory-usage">0%</p>
+                                <p class="truenas-stat-label">Used</p>
+                            </div>
+                        </div>
+                        
+                        <div class="truenas-card">
+                            <div class="truenas-stat-icon">
+                                <i class="fas fa-microchip"></i>
+                            </div>
+                            <div class="truenas-stat-content">
+                                <h3>CPU Usage</h3>
+                                <p class="truenas-stat-number" id="cpu-usage">0%</p>
+                                <p class="truenas-stat-label">Load</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="truenas-dashboard-grid">
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-chart-pie"></i> Storage Overview</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="storage-chart" class="truenas-chart-container">
+                                    <div class="truenas-storage-bar">
+                                        <div class="truenas-storage-used" style="width: 0%"></div>
+                                    </div>
+                                    <div class="truenas-storage-info">
+                                        <span>0 GB used of 0 GB total</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-clock"></i> Recent Activity</h3>
+                                <button class="truenas-btn truenas-btn-sm truenas-btn-secondary">Refresh</button>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div class="truenas-activity-list">
+                                    <div class="truenas-activity-item">
+                                        <div class="truenas-activity-icon info">
+                                            <i class="fas fa-info-circle"></i>
+                                        </div>
+                                        <div class="truenas-activity-content">
+                                            <div>System update completed</div>
+                                            <div class="truenas-activity-time">2 minutes ago</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Storage Page -->
+                <div id="storage-page" class="page">
+                    <div class="truenas-page-header">
+                        <div class="truenas-page-actions">
+                            <button class="truenas-btn truenas-btn-primary" onclick="moxnas.showModal('add-storage-modal')">
+                                <i class="fas fa-plus"></i> Add Storage Pool
+                            </button>
+                            <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.refreshStorageData()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="truenas-storage-grid">
+                        <!-- Storage Overview Card -->
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-chart-pie"></i> Storage Overview</h3>
+                                <div class="truenas-card-actions">
+                                    <button class="truenas-btn truenas-btn-sm truenas-btn-secondary" onclick="moxnas.refreshStorageStats()">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="storage-stats" class="truenas-storage-stats-container">
+                                    <div class="truenas-loading-spinner">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading storage statistics...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Storage Pools Card -->
+                        <div class="truenas-card truenas-storage-pools-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-database"></i> Storage Pools</h3>
+                                <div class="truenas-view-toggle">
+                                    <button class="truenas-btn truenas-btn-sm truenas-btn-secondary" onclick="moxnas.toggleStorageView('card')" id="storage-card-view">
+                                        <i class="fas fa-th-large"></i>
+                                    </button>
+                                    <button class="truenas-btn truenas-btn-sm truenas-btn-secondary active" onclick="moxnas.toggleStorageView('table')" id="storage-table-view">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="truenas-card-content">
+                                <!-- Card View -->
+                                <div id="storage-pools-cards" class="truenas-storage-pools-grid" style="display: none;">
+                                    <div class="truenas-loading-spinner">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading storage pools...
+                                    </div>
+                                </div>
+                                
+                                <!-- Table View -->
+                                <div id="storage-pools-table" class="truenas-table-container">
+                                    <table class="truenas-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Mount Path</th>
+                                                <th>Size</th>
+                                                <th>Used</th>
+                                                <th>Available</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="storage-table-body">
+                                            <tr>
+                                                <td colspan="7">
+                                                    <div class="truenas-loading-spinner">
+                                                        <i class="fas fa-spinner fa-spin"></i> Loading storage pools...
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mount Point Monitoring Card -->
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-heartbeat"></i> Mount Point Monitoring</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="mount-monitoring" class="monitoring-list">
+                                    <div class="truenas-loading-spinner">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading monitoring status...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shares Page -->
+                <div id="shares-page" class="page">
+                    <div class="truenas-page-header">
+                        <div class="truenas-page-actions">
+                            <button class="truenas-btn truenas-btn-primary" onclick="moxnas.showModal('add-share-modal')">
+                                <i class="fas fa-plus"></i> Add Share
+                            </button>
+                            <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.refreshSharesData()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="truenas-shares-grid">
+                        <!-- Shares Overview Card -->
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-chart-bar"></i> Shares Overview</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="shares-stats" class="truenas-shares-stats-container">
+                                    <div class="truenas-stats-grid">
+                                        <div class="truenas-stat-item">
+                                            <div class="truenas-stat-icon smb">
+                                                <i class="fas fa-share-alt"></i>
+                                            </div>
+                                            <div class="truenas-stat-content">
+                                                <div class="truenas-stat-number" id="smb-shares-count">0</div>
+                                                <div class="truenas-stat-label">SMB Shares</div>
+                                            </div>
+                                        </div>
+                                        <div class="truenas-stat-item">
+                                            <div class="truenas-stat-icon nfs">
+                                                <i class="fas fa-network-wired"></i>
+                                            </div>
+                                            <div class="truenas-stat-content">
+                                                <div class="truenas-stat-number" id="nfs-shares-count">0</div>
+                                                <div class="truenas-stat-label">NFS Exports</div>
+                                            </div>
+                                        </div>
+                                        <div class="truenas-stat-item">
+                                            <div class="truenas-stat-icon ftp">
+                                                <i class="fas fa-file-transfer"></i>
+                                            </div>
+                                            <div class="truenas-stat-content">
+                                                <div class="truenas-stat-number" id="ftp-shares-count">0</div>
+                                                <div class="truenas-stat-label">FTP Shares</div>
+                                            </div>
+                                        </div>
+                                        <div class="truenas-stat-item">
+                                            <div class="truenas-stat-icon active">
+                                                <i class="fas fa-check-circle"></i>
+                                            </div>
+                                            <div class="truenas-stat-content">
+                                                <div class="truenas-stat-number" id="active-shares-count">0</div>
+                                                <div class="truenas-stat-label">Active</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Shares Card -->
+                        <div class="truenas-card truenas-shares-list-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-folder-open"></i> Active Shares</h3>
+                                <div class="truenas-view-toggle">
+                                    <button class="truenas-btn truenas-btn-sm truenas-btn-secondary" onclick="moxnas.toggleSharesView('card')" id="shares-card-view">
+                                        <i class="fas fa-th-large"></i>
+                                    </button>
+                                    <button class="truenas-btn truenas-btn-sm truenas-btn-secondary active" onclick="moxnas.toggleSharesView('table')" id="shares-table-view">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="truenas-card-content">
+                                <!-- Card View -->
+                                <div id="shares-cards" class="truenas-shares-cards-grid" style="display: none;">
+                                    <div class="truenas-loading-spinner">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading shares...
+                                    </div>
+                                </div>
+                                
+                                <!-- Table View -->
+                                <div id="shares-table" class="truenas-table-container">
+                                    <table class="truenas-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Type</th>
+                                                <th>Path</th>
+                                                <th>Access</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="shares-table-body">
+                                            <tr>
+                                                <td colspan="6">
+                                                    <div class="truenas-loading-spinner">
+                                                        <i class="fas fa-spinner fa-spin"></i> Loading shares...
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Share Settings Card -->
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-cogs"></i> Share Settings</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div class="truenas-settings-tabs">
+                                    <button class="truenas-tab-button active" onclick="moxnas.switchTab('smb-settings')">SMB Settings</button>
+                                    <button class="truenas-tab-button" onclick="moxnas.switchTab('nfs-settings')">NFS Settings</button>
+                                    <button class="truenas-tab-button" onclick="moxnas.switchTab('ftp-settings')">FTP Settings</button>
+                                </div>
+                                
+                                <div id="smb-settings" class="truenas-tab-content active">
+                                    <form id="smb-global-settings-form" class="truenas-form">
+                                        <div class="truenas-form-group">
+                                            <label class="truenas-checkbox-label">
+                                                <input type="checkbox" id="smb-guest-enabled" name="guest_enabled" class="truenas-checkbox">
+                                                <span class="checkbox-text">Enable Guest Access</span>
+                                            </label>
+                                        </div>
+                                        <div class="truenas-form-group">
+                                            <label for="smb-encryption">Encryption</label>
+                                            <select id="smb-encryption" name="encryption" class="truenas-select">
+                                                <option value="auto">Auto</option>
+                                                <option value="required">Required</option>
+                                                <option value="disabled">Disabled</option>
+                                            </select>
+                                        </div>
+                                        <div class="truenas-form-actions">
+                                            <button type="submit" class="truenas-btn truenas-btn-primary">
+                                                <i class="fas fa-save"></i> Save SMB Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                
+                                <div id="nfs-settings" class="truenas-tab-content">
+                                    <form id="nfs-global-settings-form" class="truenas-form">
+                                        <div class="truenas-form-group">
+                                            <label for="nfs-version">NFS Version</label>
+                                            <select id="nfs-version" name="version" class="truenas-select">
+                                                <option value="3">NFSv3</option>
+                                                <option value="4">NFSv4</option>
+                                                <option value="both">Both</option>
+                                            </select>
+                                        </div>
+                                        <div class="truenas-form-group">
+                                            <label for="nfs-security">Security</label>
+                                            <select id="nfs-security" name="security" class="truenas-select">
+                                                <option value="sys">sys</option>
+                                                <option value="krb5">krb5</option>
+                                                <option value="krb5i">krb5i</option>
+                                                <option value="krb5p">krb5p</option>
+                                            </select>
+                                        </div>
+                                        <div class="truenas-form-actions">
+                                            <button type="submit" class="truenas-btn truenas-btn-primary">
+                                                <i class="fas fa-save"></i> Save NFS Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                
+                                <div id="ftp-settings" class="truenas-tab-content">
+                                    <form id="ftp-global-settings-form" class="truenas-form">
+                                        <div class="truenas-form-group">
+                                            <label class="truenas-checkbox-label">
+                                                <input type="checkbox" id="ftp-passive" name="passive_mode" class="truenas-checkbox">
+                                                <span class="checkbox-text">Passive Mode</span>
+                                            </label>
+                                        </div>
+                                        <div class="truenas-form-group">
+                                            <label class="truenas-checkbox-label">
+                                                <input type="checkbox" id="ftp-ssl" name="ssl_enabled" class="truenas-checkbox">
+                                                <span class="checkbox-text">SSL/TLS</span>
+                                            </label>
+                                        </div>
+                                        <div class="truenas-form-actions">
+                                            <button type="submit" class="truenas-btn truenas-btn-primary">
+                                                <i class="fas fa-save"></i> Save FTP Settings
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Page -->
+                <div id="network-page" class="page">
+                    <div class="truenas-page-header">
+                        <div class="truenas-page-actions">
+                            <button class="truenas-btn truenas-btn-primary" onclick="moxnas.showModal('add-interface-modal')">
+                                <i class="fas fa-plus"></i> Add Interface
+                            </button>
+                            <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.refreshNetworkData()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="truenas-network-grid">
+                        <!-- Network Interfaces Card -->
+                        <div class="truenas-card truenas-network-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-ethernet"></i> Network Interfaces</h3>
+                                <div class="truenas-card-actions">
+                                    <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.refreshInterfaces()">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="network-interfaces" class="truenas-interfaces-list">
+                                    <div class="truenas-loading">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading interfaces...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Network Services Card -->
+                        <div class="truenas-card truenas-network-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-server"></i> Network Services</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="network-services" class="truenas-service-list">
+                                    <div class="truenas-service-item">
+                                        <div class="service-info">
+                                            <span class="service-name">SMB/CIFS</span>
+                                            <span class="service-description">File sharing service</span>
+                                        </div>
+                                        <div class="service-status">
+                                            <span class="truenas-badge truenas-badge-warning" id="smb-status">Unknown</span>
+                                            <button class="truenas-btn truenas-btn-primary truenas-service-toggle" onclick="moxnas.toggleService('smb')">
+                                                <i class="fas fa-power-off"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="truenas-service-item">
+                                        <div class="service-info">
+                                            <span class="service-name">NFS</span>
+                                            <span class="service-description">Network File System</span>
+                                        </div>
+                                        <div class="service-status">
+                                            <span class="truenas-badge truenas-badge-warning" id="nfs-status">Unknown</span>
+                                            <button class="truenas-btn truenas-btn-primary truenas-service-toggle" onclick="moxnas.toggleService('nfs')">
+                                                <i class="fas fa-power-off"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="truenas-service-item">
+                                        <div class="service-info">
+                                            <span class="service-name">SSH</span>
+                                            <span class="service-description">Secure Shell</span>
+                                        </div>
+                                        <div class="service-status">
+                                            <span class="truenas-badge truenas-badge-warning" id="ssh-status">Unknown</span>
+                                            <button class="truenas-btn truenas-btn-primary truenas-service-toggle" onclick="moxnas.toggleService('ssh')">
+                                                <i class="fas fa-power-off"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="truenas-service-item">
+                                        <div class="service-info">
+                                            <span class="service-name">FTP</span>
+                                            <span class="service-description">File Transfer Protocol</span>
+                                        </div>
+                                        <div class="service-status">
+                                            <span class="truenas-badge truenas-badge-warning" id="ftp-status">Unknown</span>
+                                            <button class="truenas-btn truenas-btn-primary truenas-service-toggle" onclick="moxnas.toggleService('ftp')">
+                                                <i class="fas fa-power-off"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SMB/CIFS Settings Card -->
+                        <div class="truenas-card truenas-network-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-share-alt"></i> SMB/CIFS Settings</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <form id="smb-settings-form" class="truenas-form">
+                                    <div class="truenas-form-group">
+                                        <label for="smb-workgroup">Workgroup</label>
+                                        <input type="text" id="smb-workgroup" name="workgroup" placeholder="WORKGROUP" class="truenas-input">
+                                    </div>
+                                    <div class="truenas-form-group">
+                                        <label for="smb-server-name">Server Name</label>
+                                        <input type="text" id="smb-server-name" name="netbios_name" placeholder="MOXNAS" class="truenas-input">
+                                    </div>
+                                    <div class="truenas-form-group">
+                                        <label for="smb-server-string">Server Description</label>
+                                        <input type="text" id="smb-server-string" name="server_string" placeholder="MoxNAS Server" class="truenas-input">
+                                    </div>
+                                    <div class="truenas-form-group">
+                                        <label for="smb-security">Security Mode</label>
+                                        <select id="smb-security" name="security" class="truenas-select">
+                                            <option value="user">User Level</option>
+                                            <option value="share">Share Level</option>
+                                            <option value="domain">Domain Level</option>
+                                        </select>
+                                    </div>
+                                    <div class="truenas-form-actions">
+                                        <button type="submit" class="truenas-btn truenas-btn-primary">
+                                            <i class="fas fa-save"></i> Save Settings
+                                        </button>
+                                        <button type="button" class="truenas-btn truenas-btn-secondary" onclick="moxnas.resetSMBSettings()">
+                                            <i class="fas fa-undo"></i> Reset
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Network Statistics Card -->
+                        <div class="truenas-card truenas-network-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-chart-line"></i> Network Statistics</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="network-stats" class="truenas-stats-grid">
+                                    <div class="truenas-stat-item">
+                                        <div class="stat-value" id="network-rx-bytes">0 B</div>
+                                        <div class="stat-label">Received</div>
+                                    </div>
+                                    <div class="truenas-stat-item">
+                                        <div class="stat-value" id="network-tx-bytes">0 B</div>
+                                        <div class="stat-label">Transmitted</div>
+                                    </div>
+                                    <div class="truenas-stat-item">
+                                        <div class="stat-value" id="network-rx-packets">0</div>
+                                        <div class="stat-label">RX Packets</div>
+                                    </div>
+                                    <div class="truenas-stat-item">
+                                        <div class="stat-value" id="network-tx-packets">0</div>
+                                        <div class="stat-label">TX Packets</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DNS Settings Card -->
+                        <div class="truenas-card truenas-network-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-globe"></i> DNS Settings</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <form id="dns-settings-form" class="truenas-form">
+                                    <div class="truenas-form-group">
+                                        <label for="dns-primary">Primary DNS</label>
+                                        <input type="text" id="dns-primary" name="primary_dns" placeholder="8.8.8.8" class="truenas-input">
+                                    </div>
+                                    <div class="truenas-form-group">
+                                        <label for="dns-secondary">Secondary DNS</label>
+                                        <input type="text" id="dns-secondary" name="secondary_dns" placeholder="8.8.4.4" class="truenas-input">
+                                    </div>
+                                    <div class="truenas-form-group">
+                                        <label for="dns-search-domain">Search Domain</label>
+                                        <input type="text" id="dns-search-domain" name="search_domain" placeholder="local" class="truenas-input">
+                                    </div>
+                                    <div class="truenas-form-actions">
+                                        <button type="submit" class="truenas-btn truenas-btn-primary">
+                                            <i class="fas fa-save"></i> Save DNS Settings
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Page -->
+                <div id="system-page" class="page">
+                    <div class="truenas-dashboard-grid">
+                        <div class="truenas-card truenas-system-info-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-info-circle"></i> System Information</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div class="truenas-info-list">
+                                    <div class="truenas-info-item">
+                                        <span class="info-label">Hostname:</span>
+                                        <span class="info-value" id="system-hostname">Loading...</span>
+                                    </div>
+                                    <div class="truenas-info-item">
+                                        <span class="info-label">Uptime:</span>
+                                        <span class="info-value" id="system-uptime">Loading...</span>
+                                    </div>
+                                    <div class="truenas-info-item">
+                                        <span class="info-label">Version:</span>
+                                        <span class="info-value">MoxNAS 1.0.0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="truenas-card truenas-system-info-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-cogs"></i> Services</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div id="services-list" class="truenas-service-list">
+                                    <!-- Services will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks Page -->
+                <div id="tasks-page" class="page">
+                    <div class="truenas-page-header">
+                        <button class="truenas-btn truenas-btn-primary" onclick="openModal('add-task-modal')">
+                            <i class="fas fa-plus"></i> Add Task
+                        </button>
+                    </div>
+                    
+                    <div class="truenas-table-container">
+                        <table class="truenas-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Schedule</th>
+                                    <th>Last Run</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tasks-table-body">
+                                <!-- Tasks will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Proxmox Page -->
+                <div id="proxmox-page" class="page">
+                    <div id="proxmox-manager-container" class="truenas-card">
+                        <div class="truenas-card-header">
+                            <h3><i class="fas fa-cubes"></i> Proxmox Manager</h3>
+                        </div>
+                        <div class="truenas-card-content">
+                            <!-- Proxmox Manager will be loaded here -->
+                            <div class="truenas-loading">
+                                <i class="fas fa-spinner fa-spin"></i> Loading Proxmox Manager...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reporting Page -->
+                <div id="reporting-page" class="page">
+                    <div class="truenas-dashboard-grid">
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-chart-area"></i> Storage Usage Trend</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div class="chart-placeholder">
+                                    <i class="fas fa-chart-line"></i>
+                                    <p>Chart will be displayed here</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="truenas-card">
+                            <div class="truenas-card-header">
+                                <h3><i class="fas fa-chart-bar"></i> Network Activity</h3>
+                            </div>
+                            <div class="truenas-card-content">
+                                <div class="chart-placeholder">
+                                    <i class="fas fa-network-wired"></i>
+                                    <p>Chart will be displayed here</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="truenas-modal-overlay">
+        <!-- Add Storage Modal -->
+        <div id="add-storage-modal" class="truenas-modal">
+            <div class="truenas-modal-header">
+                <h3><i class="fas fa-plus"></i> Add Storage Pool</h3>
+                <button class="truenas-modal-close" onclick="moxnas.closeModal('add-storage-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="truenas-modal-body">
+                <form id="add-storage-form" class="truenas-form">
+                    <div class="truenas-form-group">
+                        <label>Name</label>
+                        <input type="text" id="storage-name" name="name" required placeholder="e.g., pool1" class="truenas-input">
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Mount Path</label>
+                        <input type="text" id="storage-mount-path" name="mount_path" required placeholder="/mnt/pool1" class="truenas-input">
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Storage Type</label>
+                        <select id="storage-type" name="type" required onchange="moxnas.handleStorageTypeChange()" class="truenas-select">
+                            <option value="bind">Bind Mount</option>
+                            <option value="device">Device Mount</option>
+                            <option value="directory">Directory</option>
+                        </select>
+                    </div>
+                    <div class="truenas-form-group" id="source-path-group">
+                        <label>Source Path</label>
+                        <input type="text" id="storage-source-path" name="source_path" placeholder="/path/to/source" class="truenas-input">
+                    </div>
+                    <div class="truenas-form-group" id="filesystem-group" style="display: none;">
+                        <label>Filesystem</label>
+                        <select id="storage-filesystem" name="filesystem" class="truenas-select">
+                            <option value="ext4">ext4</option>
+                            <option value="xfs">xfs</option>
+                            <option value="btrfs">btrfs</option>
+                            <option value="ntfs">ntfs</option>
+                        </select>
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Description</label>
+                        <textarea id="storage-description" name="description" placeholder="Optional description" class="truenas-textarea"></textarea>
+                    </div>
+                    <div class="truenas-form-group">
+                        <label class="truenas-checkbox-label">
+                            <input type="checkbox" id="storage-readonly" name="read_only" class="truenas-checkbox">
+                            <span class="checkbox-text">Read Only</span>
+                        </label>
+                    </div>
+                    <div class="truenas-form-group">
+                        <label class="truenas-checkbox-label">
+                            <input type="checkbox" id="storage-auto-mount" name="auto_mount" checked class="truenas-checkbox">
+                            <span class="checkbox-text">Auto Mount on Boot</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="truenas-modal-footer">
+                <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.closeModal('add-storage-modal')">Cancel</button>
+                <button class="truenas-btn truenas-btn-primary" onclick="moxnas.addStoragePool()">Add Storage Pool</button>
+            </div>
+        </div>
+
+        <!-- Add Share Modal -->
+        <div id="add-share-modal" class="truenas-modal">
+            <div class="truenas-modal-header">
+                <h3><i class="fas fa-plus"></i> Add Share</h3>
+                <button class="truenas-modal-close" onclick="moxnas.closeModal('add-share-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="truenas-modal-body">
+                <form id="add-share-form" class="truenas-form">
+                    <div class="truenas-form-group">
+                        <label>Name</label>
+                        <input type="text" id="share-name" name="name" required placeholder="e.g., documents" class="truenas-input">
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Type</label>
+                        <select id="share-type" name="type" required onchange="moxnas.handleShareTypeChange()" class="truenas-select">
+                            <option value="smb">SMB/CIFS</option>
+                            <option value="nfs">NFS</option>
+                            <option value="ftp">FTP</option>
+                        </select>
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Storage Pool</label>
+                        <select id="share-storage-pool" name="storage_pool" required class="truenas-select">
+                            <option value="">Select storage pool...</option>
+                            <!-- Options will be loaded dynamically -->
+                        </select>
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Path</label>
+                        <input type="text" id="share-path" name="path" required placeholder="/mnt/pool1/share" class="truenas-input">
+                    </div>
+                    <div class="truenas-form-group">
+                        <label>Description</label>
+                        <textarea id="share-description" name="description" placeholder="Optional description" class="truenas-textarea"></textarea>
+                    </div>
+                    
+                    <!-- SMB/CIFS specific options -->
+                    <div id="smb-options" class="truenas-share-type-options">
+                        <h4>SMB/CIFS Options</h4>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="smb-guest-access" name="guest_access" class="truenas-checkbox">
+                                <span class="checkbox-text">Allow Guest Access</span>
+                            </label>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="smb-browseable" name="browseable" checked class="truenas-checkbox">
+                                <span class="checkbox-text">Browseable</span>
+                            </label>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label>Valid Users (comma-separated)</label>
+                            <input type="text" id="smb-valid-users" name="valid_users" placeholder="user1,user2" class="truenas-input">
+                        </div>
+                    </div>
+                    
+                    <!-- NFS specific options -->
+                    <div id="nfs-options" class="truenas-share-type-options" style="display: none;">
+                        <h4>NFS Options</h4>
+                        <div class="truenas-form-group">
+                            <label>Allowed Networks</label>
+                            <input type="text" id="nfs-networks" name="allowed_networks" placeholder="192.168.1.0/24,10.0.0.0/8" class="truenas-input">
+                        </div>
+                        <div class="truenas-form-group">
+                            <label>Root Squash</label>
+                            <select id="nfs-root-squash" name="root_squash" class="truenas-select">
+                                <option value="root_squash">root_squash</option>
+                                <option value="no_root_squash">no_root_squash</option>
+                                <option value="all_squash">all_squash</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- FTP specific options -->
+                    <div id="ftp-options" class="truenas-share-type-options" style="display: none;">
+                        <h4>FTP Options</h4>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="ftp-anonymous" name="anonymous_access" class="truenas-checkbox">
+                                <span class="checkbox-text">Anonymous Access</span>
+                            </label>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label>Upload Permissions</label>
+                            <select id="ftp-upload" name="upload_permissions" class="truenas-select">
+                                <option value="none">No Upload</option>
+                                <option value="users">Authenticated Users</option>
+                                <option value="all">All Users</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Common options -->
+                    <div class="truenas-form-group">
+                        <label class="truenas-checkbox-label">
+                            <input type="checkbox" id="share-readonly" name="read_only" class="truenas-checkbox">
+                            <span class="checkbox-text">Read Only</span>
+                        </label>
+                    </div>
+                    <div class="truenas-form-group">
+                        <label class="truenas-checkbox-label">
+                            <input type="checkbox" id="share-enabled" name="enabled" checked class="truenas-checkbox">
+                            <span class="checkbox-text">Enable Share</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="truenas-modal-footer">
+                <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.closeModal('add-share-modal')">Cancel</button>
+                <button class="truenas-btn truenas-btn-primary" onclick="moxnas.addShare()">Add Share</button>
+            </div>
+        </div>
+
+        <!-- Container Creation Modal -->
+        <div id="create-container-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create LXC Container</h3>
+                    <button class="modal-close" onclick="moxnas.closeModal('create-container-modal')">
+                        &times;
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="create-container-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="container-node">Node:</label>
+                                <select id="container-node" required>
+                                    <option value="">Select Node</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="container-vmid">VMID:</label>
+                                <input type="number" id="container-vmid" min="100" max="999999" required>
+                                <small>Unique container ID (100-999999)</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="container-hostname">Hostname:</label>
+                                <input type="text" id="container-hostname" pattern="[a-zA-Z0-9-]+" required>
+                                <small>Container hostname (alphanumeric and hyphens only)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="container-template">Template:</label>
+                                <select id="container-template" required>
+                                    <option value="">Select Template</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <h4>Resource Configuration</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="container-memory">Memory (MB):</label>
+                                <input type="number" id="container-memory" value="4096" min="512" max="65536" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="container-cores">CPU Cores:</label>
+                                <input type="number" id="container-cores" value="2" min="1" max="32" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="container-disk-size">Disk Size:</label>
+                                <input type="text" id="container-disk-size" value="32G" pattern="[0-9]+G" required>
+                                <small>Size in GB (e.g., 32G, 64G)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="container-storage-pool">Storage Pool:</label>
+                                <select id="container-storage-pool" required>
+                                    <option value="">Select Storage</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <h4>Network Configuration</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="container-bridge">Network Bridge:</label>
+                                <input type="text" id="container-bridge" value="vmbr0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="container-ip">IP Configuration:</label>
+                                <select id="container-ip-type" onchange="toggleIPFields()">
+                                    <option value="dhcp">DHCP</option>
+                                    <option value="static">Static IP</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="static-ip-fields" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="container-static-ip">IP Address/CIDR:</label>
+                                    <input type="text" id="container-static-ip" placeholder="192.168.1.100/24">
+                                </div>
+                                <div class="form-group">
+                                    <label for="container-gateway">Gateway:</label>
+                                    <input type="text" id="container-gateway" placeholder="192.168.1.1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Create Container</button>
+                            <button type="button" class="btn btn-secondary" onclick="moxnas.closeModal('create-container-modal')">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Network Interface Modal -->
+        <div id="add-interface-modal" class="truenas-modal-overlay">
+            <div class="truenas-modal">
+                <div class="truenas-modal-header">
+                    <h3><i class="fas fa-plus"></i> Add Network Interface</h3>
+                    <button class="truenas-modal-close" onclick="moxnas.closeModal('add-interface-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="truenas-modal-body">
+                    <form id="add-interface-form" class="truenas-form">
+                        <div class="truenas-form-group">
+                            <label for="interface-name">Interface Name</label>
+                            <input type="text" id="interface-name" name="name" placeholder="eth0, wlan0, etc." required class="truenas-input">
+                        </div>
+                        <div class="truenas-form-group">
+                            <label for="interface-type">Interface Type</label>
+                            <select id="interface-type" name="interface_type" required class="truenas-select">
+                                <option value="ethernet">Ethernet</option>
+                                <option value="wireless">Wireless</option>
+                                <option value="bridge">Bridge</option>
+                                <option value="bond">Bond</option>
+                            </select>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="dhcp-enabled" name="dhcp_enabled" checked class="truenas-checkbox">
+                                <span class="checkbox-text">Enable DHCP</span>
+                            </label>
+                        </div>
+                        <div id="static-config" class="form-section" style="display: none;">
+                            <div class="truenas-form-row">
+                                <div class="truenas-form-group">
+                                    <label for="ip-address">IP Address</label>
+                                    <input type="text" id="ip-address" name="ip_address" placeholder="192.168.1.100" class="truenas-input">
+                                </div>
+                                <div class="truenas-form-group">
+                                    <label for="netmask">Netmask</label>
+                                    <input type="text" id="netmask" name="netmask" placeholder="255.255.255.0" class="truenas-input">
+                                </div>
+                                <div class="truenas-form-group">
+                                    <label for="gateway">Gateway</label>
+                                    <input type="text" id="gateway" name="gateway" placeholder="192.168.1.1" class="truenas-input">
+                                </div>
+                                <div class="truenas-form-group">
+                                    <label for="dns-servers">DNS Servers (comma separated)</label>
+                                    <input type="text" id="dns-servers" name="dns_servers" placeholder="8.8.8.8, 8.8.4.4" class="truenas-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label for="mtu">MTU</label>
+                            <input type="number" id="mtu" name="mtu" value="1500" min="68" max="9000" class="truenas-input">
+                        </div>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="interface-enabled" name="enabled" checked class="truenas-checkbox">
+                                <span class="checkbox-text">Enable Interface</span>
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="truenas-modal-footer">
+                    <button class="truenas-btn truenas-btn-secondary" onclick="moxnas.closeModal('add-interface-modal')">Cancel</button>
+                    <button class="truenas-btn truenas-btn-primary" onclick="moxnas.saveInterface()">Add Interface</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Network Interface Modal -->
+        <div id="edit-interface-modal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3><i class="fas fa-edit"></i> Edit Network Interface</h3>
+                    <button class="modal-close" onclick="moxnas.closeModal('edit-interface-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-interface-form">
+                        <input type="hidden" id="edit-interface-id" name="id">
+                        <div class="truenas-form-group">
+                            <label for="edit-interface-name">Interface Name</label>
+                            <input type="text" id="edit-interface-name" name="name" readonly class="truenas-input">
+                        </div>
+                        <div class="truenas-form-group">
+                            <label for="edit-interface-type">Interface Type</label>
+                            <select id="edit-interface-type" name="interface_type" class="truenas-select">
+                                <option value="ethernet">Ethernet</option>
+                                <option value="wireless">Wireless</option>
+                                <option value="bridge">Bridge</option>
+                                <option value="bond">Bond</option>
+                            </select>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="edit-dhcp-enabled" name="dhcp_enabled" class="truenas-checkbox">
+                                <span class="checkbox-text">Enable DHCP</span>
+                            </label>
+                        </div>
+                        <div id="edit-static-config" class="form-section">
+                            <div class="truenas-form-row">
+                                <div class="truenas-form-group">
+                                    <label for="edit-ip-address">IP Address</label>
+                                    <input type="text" id="edit-ip-address" name="ip_address" class="truenas-input">
+                                </div>
+                                <div class="truenas-form-group">
+                                    <label for="edit-netmask">Netmask</label>
+                                    <input type="text" id="edit-netmask" name="netmask" class="truenas-input">
+                                </div>
+                                <div class="truenas-form-group">
+                                    <label for="edit-gateway">Gateway</label>
+                                    <input type="text" id="edit-gateway" name="gateway" class="truenas-input">
+                                </div>
+                                <div class="truenas-form-group">
+                                    <label for="edit-dns-servers">DNS Servers (comma separated)</label>
+                                    <input type="text" id="edit-dns-servers" name="dns_servers" class="truenas-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="truenas-form-group">
+                            <label for="edit-mtu">MTU</label>
+                            <input type="number" id="edit-mtu" name="mtu" min="68" max="9000" class="truenas-input">
+                        </div>
+                        <div class="truenas-form-group">
+                            <label class="truenas-checkbox-label">
+                                <input type="checkbox" id="edit-interface-enabled" name="enabled" class="truenas-checkbox">
+                                <span class="checkbox-text">Enable Interface</span>
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" onclick="moxnas.deleteInterface()">Delete</button>
+                    <button class="btn btn-secondary" onclick="moxnas.closeModal('edit-interface-modal')">Cancel</button>
+                    <button class="btn btn-primary" onclick="moxnas.updateInterface()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="src/js/main.js"></script>
+    <script src="src/js/api.js"></script>
+    <script src="src/js/proxmox-simple.js"></script>
+    <script src="src/components/NetworkComponents.js"></script>
+    <script src="src/components/StorageComponents.js"></script>
+    
+    <script>
+        // Global function for refresh button
+        function refreshData() {
+            if (window.moxnas) {
+                window.moxnas.refreshData(window.moxnas.currentPage);
+            }
+        }
+    </script>
+</body>
+</html>

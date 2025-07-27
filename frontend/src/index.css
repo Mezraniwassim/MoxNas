@@ -1,0 +1,30 @@
+/* Legacy CSS - keeping for backward compatibility */
+/* The MoxNAS theme is now in moxnas-theme.css */
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Modal debugging */
+.custom-backdrop {
+  z-index: 9998 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.modal {
+  z-index: 9999 !important;
+}
+
+.modal-dialog {
+  z-index: 10000 !important;
+}
