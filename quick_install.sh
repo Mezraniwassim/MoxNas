@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# MoxNAS One-Line Installation Script
-# Usage: curl -sSL https://raw.githubusercontent.com/your-repo/MoxNas/main/quick_install.sh | bash
+# MoxNAS Automated Installation Script
+# Self-contained installation with embedded files
 
 set -e
 
@@ -19,53 +19,48 @@ error() { echo -e "${RED}[MoxNAS] ERROR: $1${NC}"; }
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
     error "This script must be run as root"
-    error "Run: sudo bash <(curl -sSL https://raw.githubusercontent.com/your-repo/MoxNas/main/quick_install.sh)"
+    error "Run as root or with sudo"
     exit 1
 fi
 
-log "🚀 Starting MoxNAS One-Line Installation..."
+log "🚀 Starting MoxNAS Automated Installation..."
 
 # Set environment
 export DEBIAN_FRONTEND=noninteractive
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 
-# Update system and install essential packages
-log "📦 Installing system dependencies..."
-apt-get update -qq && apt-get install -y curl wget git python3 python3-pip python3-venv nodejs npm
-
-# Download and extract MoxNAS
-log "⬇️ Downloading MoxNAS..."
-INSTALL_DIR="/opt/moxnas"
-TEMP_DIR="/tmp/moxnas-install"
-
-mkdir -p "$TEMP_DIR"
-cd "$TEMP_DIR"
-
-# Try multiple methods to download MoxNAS
-log "📥 Downloading MoxNAS from GitHub..."
-
-# Method 1: Git clone (preferred)
-if git clone https://github.com/Mezraniwassim/MoxNas.git . 2>/dev/null; then
-    log "✅ Downloaded via git clone"
-# Method 2: wget archive
-elif wget -q -O moxnas.zip "https://github.com/Mezraniwassim/MoxNas/archive/main.zip" 2>/dev/null && unzip -q moxnas.zip 2>/dev/null && mv MoxNas-main/* . 2>/dev/null; then
-    log "✅ Downloaded via wget"
-    rm -f moxnas.zip
-# Method 3: curl archive  
-elif curl -sL "https://github.com/Mezraniwassim/MoxNas/archive/main.zip" -o moxnas.zip 2>/dev/null && unzip -q moxnas.zip 2>/dev/null && mv MoxNas-main/* . 2>/dev/null; then
-    log "✅ Downloaded via curl"
-    rm -f moxnas.zip
+# Detect environment
+IS_LXC=false
+if [ -f /proc/1/environ ] && grep -q container=lxc /proc/1/environ; then
+    IS_LXC=true
+    log "🐳 Detected LXC container environment"
 else
-    error "❌ Failed to download MoxNAS from GitHub"
-    error "Please check your internet connection and try again"
-    exit 1
+    log "🖥️ Detected host environment"
 fi
 
-# Run the main installation
-log "🔧 Running installation..."
-chmod +x install_moxnas.sh
-./install_moxnas.sh
+# Update system and install dependencies
+log "📦 Installing system dependencies..."
+apt-get update -qq
+apt-get install -y curl wget git python3 python3-pip python3-venv nodejs npm sqlite3 unzip
+
+# Check Node.js version and install if needed
+NODE_VERSION=$(node --version 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1 || echo "0")
+if [ "$NODE_VERSION" -lt 16 ]; then
+    log "📦 Installing Node.js 18..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    apt-get install -y nodejs
+fi
+
+# Create installation directory
+INSTALL_DIR="/opt/moxnas"
+log "📁 Creating installation directory: $INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"
+cd "$INSTALL_DIR"
+
+# Create MoxNAS project structure automatically
+log "🏗️ Creating MoxNAS project structure..."
+create_moxnas_project
 
 # Get container IP
 CONTAINER_IP=$(hostname -I | awk '{print $1}' | head -1)
