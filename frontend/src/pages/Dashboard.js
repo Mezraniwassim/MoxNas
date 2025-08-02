@@ -1,17 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { FaMicrochip, FaMemory, FaHdd, FaClock, FaPlay, FaStop, FaRedo, FaTachometerAlt, FaServer, FaNetworkWired } from 'react-icons/fa';
+import { Container, Row, Col, Card, Button, Badge, Alert } from 'react-bootstrap';
+import { FaMicrochip, FaMemory, FaHdd, FaClock, FaPlay, FaStop, FaRedo, FaTachometerAlt, FaServer, FaNetworkWired, FaCog } from 'react-icons/fa';
 import { systemAPI } from '../services/api';
+import ProxmoxSetupWizard from '../components/ProxmoxSetupWizard';
 
 const Dashboard = () => {
   const [systemInfo, setSystemInfo] = useState(null);
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [setupStatus, setSetupStatus] = useState(null);
 
   useEffect(() => {
     loadData();
+    checkSetupStatus();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const checkSetupStatus = async () => {
+    try {
+      const response = await fetch('/api/core/setup/status/');
+      const data = await response.json();
+      if (data.success) {
+        setSetupStatus(data.data);
+      }
+    } catch (error) {
+      console.error('Error checking setup status:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -81,6 +98,28 @@ const Dashboard = () => {
         </h1>
         <div className="moxnas-status moxnas-status-info">{systemInfo.hostname}</div>
       </div>
+
+      {/* Proxmox Setup Banner */}
+      {setupStatus && !setupStatus.proxmox_configured && (
+        <Alert variant="warning" className="mb-4">
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <FaServer className="me-2" />
+              <strong>Proxmox Integration Setup Required</strong>
+              <br />
+              <small>Configure your Proxmox connection to manage containers and unlock full MoxNAS features.</small>
+            </div>
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => setShowSetupWizard(true)}
+            >
+              <FaCog className="me-2" />
+              Setup Proxmox
+            </Button>
+          </div>
+        </Alert>
+      )}
 
       {/* System Overview Cards */}
       <div className="moxnas-grid moxnas-grid-cols-4" style={{ marginBottom: '2rem' }}>
@@ -244,6 +283,16 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Proxmox Setup Wizard */}
+      <ProxmoxSetupWizard 
+        show={showSetupWizard}
+        onClose={() => setShowSetupWizard(false)}
+        onComplete={() => {
+          checkSetupStatus();
+          loadData();
+        }}
+      />
     </div>
   );
 };

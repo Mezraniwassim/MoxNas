@@ -27,19 +27,40 @@ class MoxNASUserViewSet(viewsets.ModelViewSet):
         instance.delete()
     
     def _create_system_user(self, user):
-        """Create system user account"""
+        """Create system user account with enhanced security"""
         try:
-            # Create home directory
-            os.makedirs(user.home_directory, exist_ok=True)
+            # Import security utilities
+            from services.security_utils import PathValidator, InputValidator, CommandValidator
+            
+            # Validate username
+            if not InputValidator.validate_username(user.username):
+                logger.error(f"Invalid username: {user.username}")
+                return False
+            
+            # Validate and sanitize home directory path
+            try:
+                safe_home_dir = PathValidator.validate_path(user.home_directory)
+            except ValueError as e:
+                logger.error(f"Invalid home directory: {e}")
+                safe_home_dir = f"/mnt/storage/users/{user.username}"
+            
+            # Create home directory with secure permissions
+            os.makedirs(safe_home_dir, mode=0o755, exist_ok=True)
             
             # Create system user with useradd
             cmd = [
                 'useradd', 
-                '-d', user.home_directory,
+                '-d', safe_home_dir,
                 '-s', user.shell,
                 '-m', user.username
             ]
-            subprocess.run(cmd, check=True)
+            
+            # Validate command before execution
+            if not CommandValidator.validate_command(cmd):
+                logger.error(f"Command validation failed: {cmd}")
+                return False
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             # Set ownership of home directory
             subprocess.run(['chown', f'{user.username}:{user.username}', user.home_directory], check=True)
@@ -71,22 +92,41 @@ class MoxNASUserViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def set_password(self, request, pk=None):
-        """Set user password"""
+        """Set user password with enhanced security"""
         user = get_object_or_404(MoxNASUser, pk=pk)
         password = request.data.get('password')
         
         if not password:
             return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Validate password strength
+        if len(password) < 8:
+            return Response({'error': 'Password must be at least 8 characters long'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate username
+        from services.security_utils import InputValidator, CommandValidator
+        if not InputValidator.validate_username(user.username):
+            return Response({'error': 'Invalid username'}, status=status.HTTP_400_BAD_REQUEST)
+        
         user.set_password(password)
         user.save()
         
-        # Set system password
+        # Set system password using chpasswd (more secure than passwd)
         try:
-            proc = subprocess.run(['passwd', user.username], input=f'{password}\n{password}\n', 
-                                text=True, capture_output=True)
-        except subprocess.CalledProcessError:
-            pass
+            cmd = ['chpasswd']
+            if CommandValidator.validate_command(cmd):
+                proc = subprocess.run(
+                    cmd, 
+                    input=f'{user.username}:{password}\n',
+                    text=True, 
+                    capture_output=True,
+                    timeout=30
+                )
+                if proc.returncode != 0:
+                    logger.warning(f"Failed to set system password for {user.username}: {proc.stderr}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            logger.error(f"Error setting system password: {e}")
         
         return Response({'success': True, 'message': 'Password updated successfully'})
 

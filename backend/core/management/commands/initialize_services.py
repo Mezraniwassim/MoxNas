@@ -64,17 +64,42 @@ class Command(BaseCommand):
         
         # Create default admin user if it doesn't exist
         if not User.objects.filter(username='admin').exists():
+            import secrets
+            import string
+            
+            # Generate secure random password
+            alphabet = string.ascii_letters + string.digits
+            admin_password = ''.join(secrets.choice(alphabet) for _ in range(16))
+            
+            # Check for environment variable override
+            admin_password = os.environ.get('MOXNAS_ADMIN_PASSWORD', admin_password)
+            
             admin_user = User.objects.create_superuser(
                 username='admin',
                 email='admin@moxnas.local',
-                password='moxnas123'
+                password=admin_password
             )
             if hasattr(admin_user, 'full_name'):
                 admin_user.full_name = 'MoxNAS Administrator'
                 admin_user.save()
-            self.stdout.write(
-                self.style.SUCCESS('Created admin user (admin/moxnas123)')
-            )
+            
+            # Save password to secure location for first-time setup
+            password_file = '/opt/moxnas/admin_password.txt'
+            try:
+                os.makedirs('/opt/moxnas', exist_ok=True)
+                with open(password_file, 'w') as f:
+                    f.write(f"Admin Username: admin\nAdmin Password: {admin_password}\n")
+                os.chmod(password_file, 0o600)  # Read-write for owner only
+                self.stdout.write(
+                    self.style.SUCCESS(f'Created admin user. Password saved to {password_file}')
+                )
+            except Exception as e:
+                self.stdout.write(
+                    self.style.WARNING(f'Admin user created with password: {admin_password}')
+                )
+                self.stdout.write(
+                    self.style.WARNING(f'Could not save to file: {e}')
+                )
         
         total_services = ServiceStatus.objects.count()
         self.stdout.write(

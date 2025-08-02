@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Table, Modal, Form, Nav, Badge, Alert } from 'react-bootstrap';
-import { FaServer, FaPlus, FaEdit, FaPlay, FaStop, FaSync, FaCube } from 'react-icons/fa';
+import { FaServer, FaPlus, FaEdit, FaPlay, FaStop, FaSync, FaCube, FaCog, FaHdd, FaShieldAlt } from 'react-icons/fa';
 import { proxmoxAPI } from '../services/api';
+import ProxmoxSetupWizard from '../components/ProxmoxSetupWizard';
+import ProxmoxStorageManager from '../components/ProxmoxStorageManager';
+import ProxmoxSessionManager from '../components/ProxmoxSessionManager';
 
 const Proxmox = () => {
   const [nodes, setNodes] = useState([]);
@@ -11,6 +14,8 @@ const Proxmox = () => {
   const [showNodeModal, setShowNodeModal] = useState(false);
   const [showContainerModal, setShowContainerModal] = useState(false);
   const [editingNode, setEditingNode] = useState(null);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [proxmoxSession, setProxmoxSession] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -363,6 +368,13 @@ const Proxmox = () => {
     <Container fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1><FaServer className="me-2" />Proxmox Management</h1>
+        <Button 
+          variant="outline-primary"
+          onClick={() => setShowSetupWizard(true)}
+        >
+          <FaCog className="me-2" />
+          Setup Wizard
+        </Button>
       </div>
 
       <Nav variant="tabs" className="mb-4">
@@ -380,6 +392,22 @@ const Proxmox = () => {
             onClick={() => setActiveTab('nodes')}
           >
             <FaServer className="me-2" />Nodes
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link 
+            active={activeTab === 'storage'} 
+            onClick={() => setActiveTab('storage')}
+          >
+            <FaHdd className="me-2" />Storage
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link 
+            active={activeTab === 'auth'} 
+            onClick={() => setActiveTab('auth')}
+          >
+            <FaShieldAlt className="me-2" />Authentication
           </Nav.Link>
         </Nav.Item>
       </Nav>
@@ -556,8 +584,58 @@ const Proxmox = () => {
         </Card>
       )}
 
+      {activeTab === 'storage' && (
+        <ProxmoxStorageManager />
+      )}
+
+      {activeTab === 'auth' && (
+        <Row>
+          <Col lg={8}>
+            <ProxmoxSessionManager 
+              onSessionChange={setProxmoxSession}
+            />
+          </Col>
+          <Col lg={4}>
+            <Card>
+              <Card.Header>
+                <h6 className="mb-0">Authentication Help</h6>
+              </Card.Header>
+              <Card.Body>
+                <div className="mb-3">
+                  <h6>Secure Connection</h6>
+                  <small className="text-muted">
+                    Connect securely to your Proxmox host to manage storage, containers, and infrastructure from MoxNAS.
+                  </small>
+                </div>
+                <div className="mb-3">
+                  <h6>Session Management</h6>
+                  <small className="text-muted">
+                    Sessions are encrypted and stored securely. They automatically expire after 2 hours for security.
+                  </small>
+                </div>
+                <div>
+                  <h6>Multi-Host Support</h6>
+                  <small className="text-muted">
+                    Save multiple Proxmox hosts for quick access. Credentials are encrypted and stored locally.
+                  </small>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
       <NodeModal />
       <ContainerModal />
+      
+      {/* Proxmox Setup Wizard */}
+      <ProxmoxSetupWizard 
+        show={showSetupWizard}
+        onClose={() => setShowSetupWizard(false)}
+        onComplete={() => {
+          loadData();
+        }}
+      />
     </Container>
   );
 };

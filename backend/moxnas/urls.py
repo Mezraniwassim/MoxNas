@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/proxmox/', include('proxmox.urls')),
     path('api/proxmox-integration/', include('proxmox_integration.urls')),
+    path('api/proxmox-auth/', include('proxmox_integration.auth_urls')),
 ]
 
 # Serve React app for all non-API routes

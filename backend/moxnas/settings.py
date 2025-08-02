@@ -13,12 +13,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='sq2j@y8w#ra)%p-508^i6jse)s)#=b@_$(vrc$p2jhc!xg#v=m')
+# Generate a new secret key if not provided
+import secrets
+import string
+
+def generate_secret_key():
+    """Generate a secure random secret key"""
+    alphabet = string.ascii_letters + string.digits + '!@#$%^&*(-_=+)'
+    return ''.join(secrets.choice(alphabet) for _ in range(50))
+
+SECRET_KEY = config('SECRET_KEY', default=generate_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+# Security: Validate ALLOWED_HOSTS configuration
+def validate_allowed_hosts():
+    """Validate ALLOWED_HOSTS for security"""
+    hosts = config('ALLOWED_HOSTS', default='*', cast=Csv())
+    
+    # For container deployment, allow all hosts by default
+    # This is necessary for LXC containers with dynamic IPs
+    if not hosts or hosts == ['']:
+        hosts = ['*']
+    
+    return hosts
+
+ALLOWED_HOSTS = validate_allowed_hosts()
 
 # Application definition
 INSTALLED_APPS = [
@@ -42,6 +63,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'core.security_middleware.SecurityHeadersMiddleware',
+    'core.security_middleware.RateLimitMiddleware', 
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -51,6 +74,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.security_middleware.SecurityLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'moxnas.urls'
@@ -127,24 +151,45 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
+    'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour'
+    }
 }
 
-# CORS settings
+# CORS settings - Allow all origins for container deployment
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+# For LXC containers, allow all origins since IPs are dynamic
+CORS_ALLOW_ALL_ORIGINS = True
 
-# Security settings for production
+# Enhanced security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Session security
+SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# CSRF protection
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
@@ -153,6 +198,10 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
     SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
     CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=True, cast=bool)
+    
+    # Additional security headers for production
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_TLS = True
 
 # Custom user model
 AUTH_USER_MODEL = 'users.MoxNASUser'
@@ -188,3 +237,72 @@ NETWORK_RETRIES = config('NETWORK_RETRIES', default=3, cast=int)
 DEFAULT_STORAGE = config('DEFAULT_STORAGE', default='local')
 STORAGE_PATH = config('STORAGE_PATH', default='/var/lib/moxnas')
 MAX_STORAGE_SIZE = config('MAX_STORAGE_SIZE', default=1073741824, cast=int)  # 1GB default
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple'
+        },
+        'file': {
+            'level': config('LOG_LEVEL', default='INFO'),
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(MOXNAS_LOG_PATH, 'moxnas.log'),
+            'maxBytes': 1024*1024*5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'security_file': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(MOXNAS_LOG_PATH, 'security.log'),
+            'maxBytes': 1024*1024*5,  # 5 MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+        },
+        'moxnas': {
+            'handlers': ['console', 'file'],
+            'level': config('LOG_LEVEL', default='INFO'),
+            'propagate': False,
+        },
+        'services': {
+            'handlers': ['console', 'file'],
+            'level': config('LOG_LEVEL', default='INFO'),
+            'propagate': False,
+        },
+        'security': {
+            'handlers': ['security_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
+
+# Ensure log directory exists
+os.makedirs(MOXNAS_LOG_PATH, exist_ok=True)

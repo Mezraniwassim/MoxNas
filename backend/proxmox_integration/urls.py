@@ -3,13 +3,16 @@ URL patterns for Proxmox Integration app
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from . import views, auth_views
+from .storage_views import ProxmoxStorageViewSet as EnhancedProxmoxStorageViewSet, ContainerStorageMountViewSet, ProxmoxBackupViewSet
 
 router = DefaultRouter()
 router.register(r'hosts', views.ProxmoxHostViewSet)
 router.register(r'nodes', views.ProxmoxNodeViewSet)
 router.register(r'containers', views.ProxmoxContainerViewSet)
-router.register(r'storage', views.ProxmoxStorageViewSet)
+router.register(r'storage', EnhancedProxmoxStorageViewSet, basename='enhanced-storage')
+router.register(r'container-storage', ContainerStorageMountViewSet, basename='container-storage')
+router.register(r'proxmox-backups', ProxmoxBackupViewSet, basename='proxmox-backups')
 router.register(r'tasks', views.ProxmoxTaskViewSet)
 
 app_name = 'proxmox_integration'

@@ -11,6 +11,7 @@ import logging
 import shutil
 from pathlib import Path
 from django.conf import settings
+from .security_utils import PathValidator, InputValidator, CommandValidator
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +25,32 @@ class ServiceManager:
     def is_service_running(self, service_name):
         """Check if a service is running"""
         try:
+            # First try systemctl
             result = subprocess.run(
                 ['systemctl', 'is-active', service_name],
                 capture_output=True,
                 text=True,
                 timeout=5
             )
-            return result.returncode == 0 and result.stdout.strip() == 'active'
+            if result.returncode == 0 and result.stdout.strip() == 'active':
+                return True
+            
+            # Fallback: check if process is running (useful in containers)
+            try:
+                ps_result = subprocess.run(
+                    ['pgrep', '-f', service_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=3
+                )
+                if ps_result.returncode == 0 and ps_result.stdout.strip():
+                    logger.info(f"Service {service_name} detected via process check")
+                    return True
+            except Exception:
+                pass
+            
+            return False
+            
         except Exception as e:
             logger.error(f"Error checking service {service_name}: {e}")
             return False
@@ -38,18 +58,61 @@ class ServiceManager:
     def start_service(self, service_name):
         """Start a service"""
         try:
+            # Basic service name validation
+            if not service_name or not isinstance(service_name, str):
+                logger.error(f"Invalid service name: {service_name}")
+                return False
+            
+            service_name = service_name.strip()
+            if not service_name.replace('-', '').replace('_', '').isalnum():
+                logger.error(f"Invalid service name format: {service_name}")
+                return False
+            
+            # Try to start with systemctl
+            command = ['systemctl', 'start', service_name]
+            
             result = subprocess.run(
-                ['systemctl', 'start', service_name],
+                command,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=15
             )
+            
             if result.returncode == 0:
                 logger.info(f"Service {service_name} started successfully")
                 return True
             else:
-                logger.error(f"Failed to start {service_name}: {result.stderr}")
+                logger.warning(f"systemctl start failed for {service_name}: {result.stderr}")
+                
+                # For containers, try alternative methods
+                if 'Failed to connect to bus' in result.stderr or 'System has not been booted with systemd' in result.stderr:
+                    logger.info(f"Trying alternative start method for {service_name} in container environment")
+                    
+                    # Try direct service commands
+                    alt_commands = {
+                        'smbd': ['/usr/sbin/smbd', '-D'],
+                        'nmbd': ['/usr/sbin/nmbd', '-D'],
+                        'vsftpd': ['/usr/sbin/vsftpd'],
+                        'nfs-kernel-server': ['service', 'nfs-kernel-server', 'start'],
+                        'ssh': ['/usr/sbin/sshd', '-D'],
+                    }
+                    
+                    if service_name in alt_commands:
+                        try:
+                            alt_result = subprocess.run(
+                                alt_commands[service_name],
+                                capture_output=True,
+                                text=True,
+                                timeout=10
+                            )
+                            if alt_result.returncode == 0:
+                                logger.info(f"Service {service_name} started using alternative method")
+                                return True
+                        except Exception as alt_e:
+                            logger.error(f"Alternative start method failed for {service_name}: {alt_e}")
+                
                 return False
+                
         except Exception as e:
             logger.error(f"Error starting service {service_name}: {e}")
             return False
@@ -102,30 +165,56 @@ class SambaManager:
     def create_share(self, share_name, path, read_only=False, guest_ok=False, **kwargs):
         """Create a new SMB share"""
         try:
-            # Validate and normalize path
+            # Validate share name - use basic validation if validator not available
+            if not share_name or not isinstance(share_name, str) or len(share_name.strip()) == 0:
+                raise ValueError(f"Invalid share name: {share_name}")
+            
+            share_name = share_name.strip()
+            if not share_name.replace('_', '').replace('-', '').isalnum():
+                raise ValueError(f"Share name must be alphanumeric: {share_name}")
+            
+            # Validate and sanitize path - use basic validation if validator not available
             if not path or not isinstance(path, str):
-                raise ValueError("Path cannot be empty")
+                path = f"/mnt/storage/{share_name}"
+            else:
+                path = os.path.abspath(path.strip())
+                # Ensure path is within allowed directories
+                allowed_bases = ['/mnt/storage', '/opt/moxnas/storage', '/tmp/moxnas']
+                if not any(path.startswith(base) for base in allowed_bases):
+                    logger.warning(f"Path {path} not in allowed directories, using default")
+                    path = f"/mnt/storage/{share_name}"
             
-            path = os.path.abspath(path.strip())
-            
-            # Security check - ensure path is within allowed directories
-            allowed_bases = ['/mnt/storage', '/opt/moxnas/storage', '/home', '/tmp/moxnas']
-            if not any(path.startswith(base) for base in allowed_bases):
-                logger.warning(f"Path {path} not in allowed directories, using /mnt/storage")
-                path = '/mnt/storage'
-            
-            # Ensure directory exists with proper permissions
+            # Ensure base storage directory exists first
+            base_storage = '/mnt/storage'
             try:
-                os.makedirs(path, exist_ok=True)
+                if not os.path.exists(base_storage):
+                    os.makedirs(base_storage, mode=0o755, exist_ok=True)
+                    logger.info(f"Created base storage directory: {base_storage}")
+            except Exception as e:
+                logger.error(f"Failed to create base storage {base_storage}: {e}")
+                return False
+            
+            # Ensure target directory exists with proper permissions
+            try:
+                if not os.path.exists(path):
+                    os.makedirs(path, mode=0o755, exist_ok=True)
+                    logger.info(f"Created share directory: {path}")
+                
+                # Set proper permissions
                 os.chmod(path, 0o755)
+                
             except OSError as e:
                 logger.error(f"Failed to create directory {path}: {e}")
                 # Try to create in default storage location
                 fallback_path = f"/mnt/storage/{share_name}"
-                os.makedirs(fallback_path, exist_ok=True)
-                os.chmod(fallback_path, 0o755)
-                path = fallback_path
-                logger.info(f"Using fallback path: {path}")
+                try:
+                    os.makedirs(fallback_path, mode=0o755, exist_ok=True)
+                    os.chmod(fallback_path, 0o755)
+                    path = fallback_path
+                    logger.info(f"Using fallback path: {path}")
+                except Exception as fe:
+                    logger.error(f"Failed to create fallback directory: {fe}")
+                    return False
             
             # Backup existing config
             if self.config_file.exists():
@@ -208,29 +297,49 @@ class NFSManager:
         try:
             # Validate and normalize path
             if not path or not isinstance(path, str):
-                raise ValueError("Path cannot be empty")
+                path = "/mnt/storage"
+                logger.info("No path provided, using default: /mnt/storage")
+            else:
+                path = os.path.abspath(path.strip())
+                
+                # Security check - ensure path is within allowed directories
+                allowed_bases = ['/mnt/storage', '/opt/moxnas/storage', '/tmp/moxnas']
+                if not any(path.startswith(base) for base in allowed_bases):
+                    logger.warning(f"Path {path} not in allowed directories, using /mnt/storage")
+                    path = '/mnt/storage'
             
-            path = os.path.abspath(path.strip())
-            
-            # Security check - ensure path is within allowed directories
-            allowed_bases = ['/mnt/storage', '/opt/moxnas/storage', '/home', '/tmp/moxnas']
-            if not any(path.startswith(base) for base in allowed_bases):
-                logger.warning(f"Path {path} not in allowed directories, using /mnt/storage")
-                path = '/mnt/storage'
-            
-            # Ensure directory exists with proper permissions
+            # Ensure base storage directory exists first
+            base_storage = '/mnt/storage'
             try:
-                os.makedirs(path, exist_ok=True)
+                if not os.path.exists(base_storage):
+                    os.makedirs(base_storage, mode=0o755, exist_ok=True)
+                    logger.info(f"Created base storage directory: {base_storage}")
+            except Exception as e:
+                logger.error(f"Failed to create base storage {base_storage}: {e}")
+                return False
+            
+            # Ensure target directory exists with proper permissions
+            try:
+                if not os.path.exists(path):
+                    os.makedirs(path, mode=0o755, exist_ok=True)
+                    logger.info(f"Created NFS export directory: {path}")
+                
+                # Set proper permissions
                 os.chmod(path, 0o755)
+                
             except OSError as e:
                 logger.error(f"Failed to create directory {path}: {e}")
                 # Try to create in default storage location
                 fallback_path = "/mnt/storage"
-                if not os.path.exists(fallback_path):
-                    os.makedirs(fallback_path, exist_ok=True)
+                try:
+                    if not os.path.exists(fallback_path):
+                        os.makedirs(fallback_path, mode=0o755, exist_ok=True)
                     os.chmod(fallback_path, 0o755)
-                path = fallback_path
-                logger.info(f"Using fallback path: {path}")
+                    path = fallback_path
+                    logger.info(f"Using fallback path: {path}")
+                except Exception as fe:
+                    logger.error(f"Failed to create fallback directory: {fe}")
+                    return False
             
             # Build export options
             options = []

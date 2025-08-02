@@ -20,7 +20,26 @@ class ProxmoxAPI:
         self.password = password
         self.realm = realm
         self.ssl_verify = ssl_verify
-        self.base_url = f"https://{host}:{port}/api2/json"
+        
+        # Handle container-to-host communication
+        # If we're in a container and host is localhost/127.0.0.1, use gateway IP
+        if host in ['localhost', '127.0.0.1', '::1']:
+            try:
+                import subprocess
+                result = subprocess.run(['ip', 'route', 'show', 'default'], 
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    # Extract gateway IP from 'default via X.X.X.X dev eth0'
+                    for line in result.stdout.split('\n'):
+                        if 'default via' in line:
+                            gateway_ip = line.split()[2]
+                            self.host = gateway_ip
+                            logger.info(f"Container detected, using gateway IP: {gateway_ip}")
+                            break
+            except Exception as e:
+                logger.warning(f"Failed to detect gateway IP: {e}")
+        
+        self.base_url = f"https://{self.host}:{port}/api2/json"
         self.ticket = None
         self.csrf_token = None
         
@@ -94,12 +113,16 @@ class ProxmoxAPI:
             return result.get('data', [])
             
         except requests.exceptions.SSLError as e:
-            logger.error(f"SSL Error connecting to Proxmox: {e}")
-            logger.info("Consider setting PROXMOX_SSL_VERIFY=False in your environment if using self-signed certificates")
+            logger.error(f"SSL Error connecting to Proxmox at {self.host}:{self.port}: {e}")
+            logger.info("Try setting SSL Verify to False for self-signed certificates")
             return []
         except requests.exceptions.ConnectionError as e:
-            logger.error(f"Connection Error to Proxmox: {e}")
-            logger.info("Check that Proxmox host is reachable and port is correct")
+            logger.error(f"Connection Error to Proxmox at {self.host}:{self.port}: {e}")
+            logger.info("Possible solutions:")
+            logger.info("1. Check Proxmox host IP is correct")
+            logger.info("2. Ensure port 8006 is accessible from container")
+            logger.info("3. Check firewall settings on Proxmox host")
+            logger.info("4. If in container, host may need to be gateway IP, not localhost")
             return []
         except requests.exceptions.Timeout as e:
             logger.error(f"Timeout connecting to Proxmox: {e}")

@@ -7,8 +7,10 @@ MoxNAS is a lightweight, containerized Network Attached Storage (NAS) solution d
 **One-line installation:**
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/quick_install.sh | sudo bash
 ```
+
+**That's it!** MoxNAS will be automatically installed and running at `http://CONTAINER_IP:8000`
 
 ## Features
 
@@ -20,33 +22,57 @@ curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_
 - **Network Configuration**: Container-friendly network setup
 - **System Monitoring**: Real-time system performance monitoring
 
-## Quick Installation
+## Installation Methods
 
-### One-Line Installation (On Proxmox Host)
+### Universal Installation (Works on Any Proxmox)
+
+**For any existing LXC container or Ubuntu system:**
 
 ```bash
-# Install with default container ID (200)
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash
-
-# Install with custom container ID
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install_moxnas.sh | bash -s 201
-
-# If installation fails, run the diagnostic helper
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/manual_install_helper.sh | bash
-
-# Debug storage configuration
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/debug_proxmox_storage.sh | bash
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/quick_install.sh | sudo bash
 ```
 
-### Installation Process
+**That's it!** Works with:
+- ✅ Any Proxmox version (7.x, 8.x+)
+- ✅ Any container ID (100, 200, 999, etc.)
+- ✅ Any Ubuntu LXC container (20.04, 22.04, 24.04)
+- ✅ Any storage configuration (local, NFS, Ceph, ZFS)
+- ✅ Any network setup (DHCP, static IP, VLAN)
 
-The installation script will:
+### Need to Create a Container?
 
-1. **Create LXC Container**: Ubuntu 22.04 with 2GB RAM, 8GB disk
-2. **Install Dependencies**: Python, Node.js, and all NAS services
-3. **Download MoxNAS**: Clone repository and setup environment
-4. **Configure Services**: SMB, NFS, FTP, SSH, SNMP, iSCSI
-5. **Start MoxNAS**: Web interface and all services
+**Option 1 - Use Proxmox Web Interface:**
+1. Go to Proxmox web interface
+2. Create new LXC container with Ubuntu template
+3. Allocate 2GB+ RAM, 8GB+ disk
+4. Start container and enter it
+5. Run the installation command above
+
+**Option 2 - Command Line (Example):**
+```bash
+# Example - adjust ID, storage, network for your environment
+CTID=200  # Change to available container ID
+pct create $CTID local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.xz \
+  --hostname moxnas \
+  --memory 2048 \
+  --cores 2 \
+  --rootfs local-lvm:8 \
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+  --unprivileged 1
+
+# Start and install
+pct start $CTID
+pct enter $CTID
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/quick_install.sh | sudo bash
+```
+
+### What the Installation Does:
+
+1. **System Setup**: Install Python, Node.js, and system dependencies
+2. **NAS Services**: Install and configure Samba, NFS, FTP, SSH
+3. **MoxNAS App**: Download, build, and configure the web interface
+4. **Service Config**: Optimize all services for container environment
+5. **Auto-Start**: Launch MoxNAS web interface on port 8000
 
 ### Manual Installation
 
@@ -84,7 +110,13 @@ echo "Access MoxNAS at: http://$CONTAINER_IP"
 **Default Login Credentials:**
 
 - Username: `admin`
-- Password: `moxnas123`
+- Password: Generated during installation (check `/opt/moxnas/admin_password.txt` in container)
+
+To view the password:
+
+```bash
+pct exec [container-id] -- cat /opt/moxnas/admin_password.txt
+```
 
 ### Container Management
 
