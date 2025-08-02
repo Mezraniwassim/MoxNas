@@ -2,7 +2,7 @@
 
 # MoxNAS Complete Automated Installation for Proxmox
 # Creates LXC container and installs MoxNAS in one command
-# Usage: bash proxmox_auto_install.sh
+# Usage: curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/main/proxmox_auto_install.sh | bash
 
 set -e
 
