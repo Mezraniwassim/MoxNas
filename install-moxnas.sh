@@ -8,6 +8,8 @@ set -euo pipefail
 
 # Configuration
 MOXNAS_VERSION="2.0.0"
+TEST_MODE="false"
+AUTO_MODE="false"
 GITHUB_REPO="Mezraniwassim/MoxNas"
 INSTALL_LOG="/tmp/moxnas-install.log"
 REQUIREMENTS_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/master/requirements.txt"
@@ -126,11 +128,13 @@ check_system_requirements() {
 check_proxmox() {
     log "Validating Proxmox environment..."
     
-    # Check if running on Proxmox
-    if ! command -v pct >/dev/null 2>&1; then
-        error "This script must be run on a Proxmox VE host"
-        error "Current system: $(uname -a)"
-        exit 1
+    # Check if running on Proxmox (skip in test mode)
+    if [[ "$TEST_MODE" != "true" ]]; then
+        if ! command -v pct >/dev/null 2>&1; then
+            error "This script must be run on a Proxmox VE host"
+            error "Current system: $(uname -a)"
+            exit 1
+        fi
     fi
     
     # Check root privileges
@@ -141,13 +145,17 @@ check_proxmox() {
     fi
     
     # Check Proxmox version
-    local pve_version=$(pveversion | head -1 | cut -d'/' -f2 | cut -d'-' -f1)
-    log "Proxmox VE version: $pve_version"
-    
-    # Verify essential services
-    if ! systemctl is-active --quiet pvedaemon; then
-        error "Proxmox daemon is not running"
-        exit 1
+    if [[ "$TEST_MODE" != "true" ]]; then
+        local pve_version=$(pveversion | head -1 | cut -d'/' -f2 | cut -d'-' -f1)
+        log "Proxmox VE version: $pve_version"
+        
+        # Verify essential services
+        if ! systemctl is-active --quiet pvedaemon; then
+            error "Proxmox daemon is not running"
+            exit 1
+        fi
+    else
+        log "Proxmox VE version: 8.1.0 (test mode)"
     fi
     
     success "Proxmox VE environment validated"
@@ -586,6 +594,19 @@ test_installation() {
 
 # Main function with enhanced workflow
 main() {
+    # Parse arguments
+    for arg in "$@"; do
+        case $arg in
+            --test-mode)
+                TEST_MODE="true"
+                warning "Running in TEST MODE - Proxmox checks will be bypassed"
+                ;;
+            --auto)
+                AUTO_MODE="true"
+                ;;
+        esac
+    done
+    
     # Initialize logging
     echo "MoxNas Installation Log - $(date)" > "$INSTALL_LOG"
     
@@ -605,7 +626,7 @@ main() {
     echo -e "Storage: ${BOLD}$AVAILABLE_STORAGE${NC}"
     echo
     
-    if [[ "${1:-}" != "--auto" ]]; then
+    if [[ "$AUTO_MODE" != "true" ]]; then
         read -p "Continue with installation? (y/N): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
