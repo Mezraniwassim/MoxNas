@@ -1,0 +1,13 @@
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+python-decouple==3.8
+requests==2.31.0
+proxmoxer==2.0.1
+paramiko==3.3.1
+gunicorn==21.2.0
+whitenoise==6.6.0
+django-extensions==3.2.3
+psutil==5.9.6
+celery==5.3.4
+redis==5.0.1
