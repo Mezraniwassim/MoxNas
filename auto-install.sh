@@ -50,10 +50,29 @@ check_proxmox() {
 detect_environment() {
     log "Auto-detecting Proxmox environment..."
     
-    # Detect available storage
-    AVAILABLE_STORAGE=$(pvesm status | grep -v "^Name" | head -1 | awk '{print $1}')
+    # Detect available storage for containers
+    log "Detecting available storage..."
+    pvesm status
+    echo
+    
+    # Look for storage that supports containers (not 'local' which is for ISOs/templates)
+    AVAILABLE_STORAGE=$(pvesm status | awk 'NR>1 && $3=="active" && $1!="local" {print $1}' | head -1)
+    
     if [[ -z "$AVAILABLE_STORAGE" ]]; then
-        AVAILABLE_STORAGE="local-lvm"
+        # Fallback: check common container storage names
+        for storage in local-lvm local-zfs pve-storage data; do
+            if pvesm status | grep -q "^$storage"; then
+                AVAILABLE_STORAGE="$storage"
+                break
+            fi
+        done
+    fi
+    
+    if [[ -z "$AVAILABLE_STORAGE" ]]; then
+        error "No suitable storage found for containers. Please configure storage in Proxmox first."
+        echo "Available storage:"
+        pvesm status
+        exit 1
     fi
     
     # Detect network bridge
