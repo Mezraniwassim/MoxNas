@@ -1,37 +1,58 @@
-# MoxNas - NAS Management for Proxmox
+# MoxNas - Professional NAS Management for Proxmox
 
-Complete NAS solution running in LXC containers on Proxmox VE.
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Proxmox](https://img.shields.io/badge/Proxmox-VE%208.0+-red.svg)](https://www.proxmox.com/)
+[![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://python.org)
+[![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org)
 
-## One-Command Installation
+**Enterprise-grade Network Attached Storage solution designed specifically for Proxmox Virtual Environment**
 
-Run this single command on your Proxmox host as root:
+🚀 Deploy complete NAS functionality in LXC containers with modern web management interface
+
+# 🚀 One-Command Installation
+
+## Quick Install (Recommended)
+
+Copy and paste this single command on your Proxmox host as root:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/quick-install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas.sh | bash
 ```
 
-Or download and run locally:
+## Alternative Installation Methods
 
+### Auto-install (No prompts)
 ```bash
-wget https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/quick-install.sh
-chmod +x quick-install.sh
-./quick-install.sh
+curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas.sh | bash -s -- --auto
+```
+
+### Download and inspect first
+```bash
+wget https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas.sh
+chmod +x install-moxnas.sh
+./install-moxnas.sh
 ```
 
 ## What It Does
 
-The installation script automatically:
-
-✅ **Detects your environment** - storage, network, resources  
-✅ **Creates optimized container** - 3GB+ RAM, proper CPU allocation  
-✅ **Installs complete system** - Django backend, React frontend, NAS services  
-✅ **Configures everything** - database, services, network  
-✅ **Tests installation** - ensures everything works  
+✅ **Auto-detects** your Proxmox environment  
+✅ **Creates** optimized LXC container  
+✅ **Installs** complete MoxNas system  
+✅ **Configures** all services automatically  
+✅ **Tests** installation  
 
 ## After Installation
 
-Access your MoxNas at: `http://[CONTAINER_IP]:8000`  
-Login: `admin / admin123`
+- **Web Interface**: `http://[CONTAINER_IP]:8000`
+- **Login**: `admin` / `admin123`
+- **Change password immediately!`
+
+## Requirements
+
+- Proxmox VE 8.0+
+- 4GB+ RAM recommended
+- 10GB+ storage space
+- Internet connection
 
 ## Features
 
@@ -42,9 +63,7 @@ Login: `admin / admin123`
 - **User Management** - Accounts and permissions
 - **Real-time Monitoring** - Resource usage and status
 
-## Alternative Installation Methods
-
-### Manual Installation
+## Manual Installation
 
 ```bash
 # Clone the repository
