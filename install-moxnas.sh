@@ -89,11 +89,20 @@ cleanup() {
     local exit_code=$?
     if [ $exit_code -ne 0 ]; then
         error "Installation failed! Check log: $INSTALL_LOG"
+        
+        # Offer cleanup options
+        if [[ "$TEST_MODE" != "true" && -n "${CONTAINER_ID:-}" ]]; then
+            echo -e "\n${YELLOW}Container Cleanup Options:${NC}"
+            echo "1. Keep container for debugging: pct exec $CONTAINER_ID -- bash"
+            echo "2. Remove failed container: pct stop $CONTAINER_ID && pct destroy $CONTAINER_ID"
+        fi
+        
         echo -e "\n${YELLOW}Troubleshooting:${NC}"
         echo "1. Check Proxmox VE version (requires 8.0+)"
         echo "2. Ensure running as root"
         echo "3. Verify network connectivity"
         echo "4. Check available storage space"
+        echo "5. Review installation log: $INSTALL_LOG"
         echo -e "\n${BLUE}Support: https://github.com/${GITHUB_REPO}/issues${NC}"
     fi
 }
@@ -164,6 +173,28 @@ check_proxmox() {
 # Enhanced environment detection
 detect_environment() {
     log "Auto-detecting optimal Proxmox configuration..."
+    
+    if [[ "$TEST_MODE" == "true" ]]; then
+        # Mock values for test mode
+        warning "Using test mode values for environment detection"
+        AVAILABLE_STORAGE="local"
+        NETWORK_BRIDGE="vmbr0"
+        CONTAINER_ID=200
+        CONTAINER_MEMORY=4096
+        CONTAINER_CORES=2
+        CONTAINER_SWAP=1024
+        CONTAINER_DISK=32
+        
+        success "Environment optimally configured (test mode):"
+        echo -e "  ${CYAN}Storage:${NC} $AVAILABLE_STORAGE"
+        echo -e "  ${CYAN}Network:${NC} $NETWORK_BRIDGE"
+        echo -e "  ${CYAN}Container ID:${NC} $CONTAINER_ID"
+        echo -e "  ${CYAN}Memory:${NC} ${CONTAINER_MEMORY}MB"
+        echo -e "  ${CYAN}CPU Cores:${NC} $CONTAINER_CORES"
+        echo -e "  ${CYAN}Swap:${NC} ${CONTAINER_SWAP}MB"
+        echo -e "  ${CYAN}Disk:${NC} ${CONTAINER_DISK}GB"
+        return 0
+    fi
     
     # Storage detection with priority order
     info "Scanning available storage..."
@@ -257,6 +288,11 @@ detect_environment() {
 ensure_template() {
     log "Ensuring Ubuntu 22.04 LTS template..."
     
+    if [[ "$TEST_MODE" == "true" ]]; then
+        success "Ubuntu template ready (test mode)"
+        return 0
+    fi
+    
     local template_file="/var/lib/vz/template/cache/ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
     local template_name="ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
     
@@ -286,6 +322,15 @@ ensure_template() {
 # Create container
 create_container() {
     log "Creating container $CONTAINER_ID with optimized settings..."
+    
+    if [[ "$TEST_MODE" == "true" ]]; then
+        success "Container $CONTAINER_ID created successfully (test mode)"
+        success "Container started successfully (test mode)"
+        success "Network configuration completed (test mode)"
+        CONTAINER_IP="192.168.1.100"
+        success "Container IP obtained: $CONTAINER_IP (test mode)"
+        return 0
+    fi
     
     # Create container with comprehensive configuration
     if ! pct create $CONTAINER_ID \
@@ -322,7 +367,8 @@ create_container() {
     local elapsed=0
     
     while [ $elapsed -lt $timeout ]; do
-        if pct exec $CONTAINER_ID -- ip route | grep -q default; then
+        # Check for default route and network interface
+        if pct exec $CONTAINER_ID -- bash -c "ip route | grep -q default && ip link show eth0 | grep -q 'state UP'" 2>/dev/null; then
             break
         fi
         sleep 2
@@ -331,8 +377,14 @@ create_container() {
     
     if [ $elapsed -ge $timeout ]; then
         error "Network configuration timeout"
+        # Try to diagnose network issues
+        log "Network diagnostic information:"
+        pct exec $CONTAINER_ID -- ip addr show || true
+        pct exec $CONTAINER_ID -- ip route show || true
         return 1
     fi
+    
+    success "Network configuration completed"
     
     # Get container IP with retry logic
     log "Obtaining container IP address..."
@@ -340,7 +392,18 @@ create_container() {
     local ip_elapsed=0
     
     while [ $ip_elapsed -lt $ip_timeout ]; do
-        CONTAINER_IP=$(pct exec $CONTAINER_ID -- hostname -I 2>/dev/null | awk '{print $1}' | tr -d '\n' || true)
+        # Try multiple methods to get IP address
+        CONTAINER_IP=$(pct exec $CONTAINER_ID -- bash -c "ip route get 1 2>/dev/null | awk '{print \$7; exit}'" 2>/dev/null || true)
+        
+        # Fallback to hostname -I if first method fails
+        if [[ ! $CONTAINER_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            CONTAINER_IP=$(pct exec $CONTAINER_ID -- hostname -I 2>/dev/null | awk '{print $1}' | tr -d '\n' || true)
+        fi
+        
+        # Fallback to ip addr show
+        if [[ ! $CONTAINER_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            CONTAINER_IP=$(pct exec $CONTAINER_ID -- bash -c "ip addr show eth0 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d'/' -f1" 2>/dev/null || true)
+        fi
         
         if [[ $CONTAINER_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             success "Container IP obtained: $CONTAINER_IP"
@@ -358,6 +421,11 @@ create_container() {
 # Enhanced dependency installation
 install_dependencies() {
     log "Installing system dependencies..."
+    
+    if [[ "$TEST_MODE" == "true" ]]; then
+        success "System dependencies installed successfully (test mode)"
+        return 0
+    fi
     
     # Update package database
     info "Updating package database..."
@@ -406,6 +474,11 @@ install_dependencies() {
 # Enhanced application setup
 setup_application() {
     log "Setting up MoxNas application..."
+    
+    if [[ "$TEST_MODE" == "true" ]]; then
+        success "MoxNas application configured successfully (test mode)"
+        return 0
+    fi
     
     # Clone repository
     info "Cloning MoxNas repository..."
@@ -457,9 +530,27 @@ setup_application() {
     # Database setup
     info "Configuring PostgreSQL database..."
     
-    # Start PostgreSQL
+    # Start PostgreSQL with health check
     pct exec $CONTAINER_ID -- systemctl start postgresql
     pct exec $CONTAINER_ID -- systemctl enable postgresql
+    
+    # Wait for PostgreSQL to be ready
+    info "Waiting for PostgreSQL to be ready..."
+    local pg_timeout=30
+    local pg_elapsed=0
+    while [ $pg_elapsed -lt $pg_timeout ]; do
+        if pct exec $CONTAINER_ID -- sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
+            success "PostgreSQL is ready"
+            break
+        fi
+        sleep 2
+        pg_elapsed=$((pg_elapsed + 2))
+    done
+    
+    if [ $pg_elapsed -ge $pg_timeout ]; then
+        error "PostgreSQL failed to start properly"
+        return 1
+    fi
     
     # Create database and user
     if ! pct exec $CONTAINER_ID -- sudo -u postgres createdb moxnas_db 2>/dev/null; then
@@ -543,6 +634,11 @@ EOF
 configure_services() {
     log "Configuring services..."
     
+    if [[ "$TEST_MODE" == "true" ]]; then
+        success "Services started (test mode)"
+        return 0
+    fi
+    
     # Systemd service
     cat > /tmp/moxnas.service << 'EOF'
 [Unit]
@@ -579,16 +675,52 @@ EOF
 test_installation() {
     log "Testing installation..."
     
-    # Wait for service
-    for i in {1..30}; do
-        if curl -s --connect-timeout 5 http://$CONTAINER_IP:8000 >/dev/null; then
+    if [[ "$TEST_MODE" == "true" ]]; then
+        success "✓ Installation test skipped (test mode)"
+        return 0
+    fi
+    
+    # Test database connection
+    info "Testing database connection..."
+    if ! pct exec $CONTAINER_ID -- sudo -u postgres psql -d moxnas_db -c "SELECT 1;" >/dev/null 2>&1; then
+        error "Database connection test failed"
+        return 1
+    fi
+    success "✓ Database connection working"
+    
+    # Test Python virtual environment
+    info "Testing Python environment..."
+    if ! pct exec $CONTAINER_ID -- /opt/moxnas/venv/bin/python --version >/dev/null 2>&1; then
+        error "Python virtual environment test failed"
+        return 1
+    fi
+    success "✓ Python environment working"
+    
+    # Test Django application
+    info "Testing Django application..."
+    if ! pct exec $CONTAINER_ID -- bash -c "cd /opt/moxnas/backend && /opt/moxnas/venv/bin/python manage.py check" >/dev/null 2>&1; then
+        error "Django application test failed"
+        return 1
+    fi
+    success "✓ Django application working"
+    
+    # Test web interface
+    info "Testing web interface..."
+    local web_timeout=60
+    local web_elapsed=0
+    
+    while [ $web_elapsed -lt $web_timeout ]; do
+        if curl -s --connect-timeout 5 http://$CONTAINER_IP:8000 >/dev/null 2>&1; then
             success "✓ Web interface accessible"
             return 0
         fi
         sleep 3
+        web_elapsed=$((web_elapsed + 3))
     done
     
-    warning "Web interface test failed"
+    warning "Web interface test failed - service may need more time to start"
+    log "You can manually check the service status with:"
+    log "  pct exec $CONTAINER_ID -- systemctl status moxnas"
     return 1
 }
 
