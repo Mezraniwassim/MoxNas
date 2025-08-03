@@ -58,6 +58,11 @@ detect_environment() {
     # Look for storage that supports containers (not 'local' which is for ISOs/templates)
     AVAILABLE_STORAGE=$(pvesm status | awk 'NR>1 && $3=="active" && $1!="local" {print $1}' | head -1)
     
+    # Force local-lvm if available (most common for containers)
+    if pvesm status | grep -q "^local-lvm"; then
+        AVAILABLE_STORAGE="local-lvm"
+    fi
+    
     if [[ -z "$AVAILABLE_STORAGE" ]]; then
         # Fallback: check common container storage names
         for storage in local-lvm local-zfs pve-storage data; do
@@ -74,6 +79,8 @@ detect_environment() {
         pvesm status
         exit 1
     fi
+    
+    log "Selected storage: $AVAILABLE_STORAGE"
     
     # Detect network bridge
     NETWORK_BRIDGE=$(ip link show type bridge | grep -o "vmbr[0-9]*" | head -1)
