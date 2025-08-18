@@ -9,24 +9,16 @@
 
 🚀 Deploy complete NAS functionality in LXC containers with modern web management interface
 
-# 🚀 One-Command Installation
+## One-Command Installation
 
-## Quick Install (Recommended)
-
-Copy and paste this single command on your Proxmox host as root:
+Run this single command on your Proxmox host as root:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas.sh | bash
 ```
 
-## Alternative Installation Methods
+Or download and run locally:
 
-### Auto-install (No prompts)
-```bash
-curl -sSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas.sh | bash -s -- --auto
-```
-
-### Download and inspect first
 ```bash
 wget https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas.sh
 chmod +x install-moxnas.sh
@@ -35,24 +27,18 @@ chmod +x install-moxnas.sh
 
 ## What It Does
 
-✅ **Auto-detects** your Proxmox environment  
-✅ **Creates** optimized LXC container  
-✅ **Installs** complete MoxNas system  
-✅ **Configures** all services automatically  
-✅ **Tests** installation  
+The installation script automatically:
+
+✅ **Detects your environment** - storage, network, resources  
+✅ **Creates optimized container** - 3GB+ RAM, proper CPU allocation  
+✅ **Installs complete system** - Django backend, React frontend, NAS services  
+✅ **Configures everything** - database, services, network  
+✅ **Tests installation** - ensures everything works  
 
 ## After Installation
 
-- **Web Interface**: `http://[CONTAINER_IP]:8000`
-- **Login**: `admin` / `admin123`
-- **Change password immediately!`
-
-## Requirements
-
-- Proxmox VE 8.0+
-- 4GB+ RAM recommended
-- 10GB+ storage space
-- Internet connection
+Access your MoxNas at: `http://[CONTAINER_IP]:8000`  
+Login: `admin / admin123`
 
 ## Features
 
@@ -63,7 +49,9 @@ chmod +x install-moxnas.sh
 - **User Management** - Accounts and permissions
 - **Real-time Monitoring** - Resource usage and status
 
-## Manual Installation
+## Alternative Installation Methods
+
+### Manual Installation
 
 ```bash
 # Clone the repository

@@ -1,37 +1,47 @@
 {
   "name": "moxnas-frontend",
   "version": "1.0.0",
+  "description": "MoxNAS Network Attached Storage - Web Interface",
   "private": true,
+  "homepage": ".",
   "dependencies": {
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.10",
+    "@mui/material": "^5.15.10",
+    "@mui/x-data-grid": "^6.19.5",
+    "@tanstack/react-query": "^5.28.4",
+    "axios": "^1.6.7",
+    "chart.js": "^4.4.1",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^3.3.1",
+    "formik": "^2.4.5",
+    "js-cookie": "^3.0.5",
     "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.8.1",
-    "react-scripts": "5.0.1",
-    "axios": "^1.6.2",
-    "react-query": "^3.39.3",
-    "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.294.0",
-    "clsx": "^2.0.0",
-    "tailwindcss": "^3.3.6",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32"
+    "react-router-dom": "^6.22.1",
+    "yup": "^1.4.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "NODE_OPTIONS=--max-old-space-size=1536 react-scripts build",
-    "build:prod": "NODE_OPTIONS=--max-old-space-size=2048 GENERATE_SOURCEMAP=false react-scripts build",
-    "test": "react-scripts test",
+    "start": "GENERATE_SOURCEMAP=false react-scripts start",
+    "build": "NODE_OPTIONS='--max-old-space-size=1024' GENERATE_SOURCEMAP=false react-scripts build",
+    "build-lxc": "NODE_OPTIONS='--max-old-space-size=512' GENERATE_SOURCEMAP=false react-scripts build",
+    "build-minimal": "NODE_OPTIONS='--max-old-space-size=256' GENERATE_SOURCEMAP=false react-scripts build",
+    "test": "react-scripts test --watchAll=false",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "rules": {
+      "no-unused-vars": "warn",
+      "no-console": "warn",
+      "prefer-const": "error"
+    }
   },
   "browserslist": {
     "production": [
@@ -46,9 +56,42 @@
     ]
   },
   "devDependencies": {
-    "@types/node": "^20.9.2",
+    "@testing-library/jest-dom": "^6.1.4",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/jest": "^29.5.8",
+    "@types/node": "^20.9.0",
     "@types/react": "^18.2.37",
-    "@types/react-dom": "^18.2.15"
+    "@types/react-dom": "^18.2.15",
+    "eslint": "^8.53.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.1.0",
+    "react-scripts": "^5.0.1",
+    "typescript": "^5.2.2"
   },
-  "proxy": "http://localhost:8000"
+  "proxy": "http://localhost:8000",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "nas",
+    "storage",
+    "proxmox",
+    "zfs",
+    "samba",
+    "nfs",
+    "file-sharing",
+    "web-interface"
+  ],
+  "author": "MoxNAS Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moxnas/moxnas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moxnas/moxnas/issues"
+  }
 }

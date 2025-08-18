@@ -1,0 +1,116 @@
+# MoxNAS Nginx Configuration
+# Generated at: {{ generation_time }}
+
+upstream moxnas_backend {
+    server 127.0.0.1:8001;
+}
+
+server {
+    listen 8000 default_server;
+    listen [::]:8000 default_server;
+    
+    server_name {{ server_name|default('_') }};
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    
+    # Client max body size (for file uploads)
+    client_max_body_size {{ max_upload_size|default('1G') }};
+    
+    # Timeouts
+    proxy_connect_timeout 300s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+    
+    # Static files
+    location /static/ {
+        alias /opt/moxnas/backend/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    location /media/ {
+        alias /opt/moxnas/backend/media/;
+        expires 1d;
+    }
+    
+    # React frontend
+    location / {
+        try_files $uri $uri/ @react;
+    }
+    
+    location @react {
+        root /opt/moxnas/frontend/build;
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Django API
+    location /api/ {
+        proxy_pass http://moxnas_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Buffer settings
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+    
+    # Django admin
+    location /admin/ {
+        proxy_pass http://moxnas_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Health check endpoint
+    location /health/ {
+        proxy_pass http://moxnas_backend;
+        access_log off;
+    }
+    
+    # Error pages
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+    
+    location = /50x.html {
+        root /opt/moxnas/frontend/build;
+    }
+}
+
+{% if ssl_enabled %}
+server {
+    listen 8443 ssl http2;
+    listen [::]:8443 ssl http2;
+    
+    server_name {{ server_name|default('_') }};
+    
+    # SSL configuration
+    ssl_certificate {{ ssl_cert_path|default('/etc/ssl/certs/moxnas.crt') }};
+    ssl_certificate_key {{ ssl_key_path|default('/etc/ssl/private/moxnas.key') }};
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1h;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    
+    # Same configuration as HTTP version
+    # ... (copy all location blocks from above)
+}
+{% endif %}

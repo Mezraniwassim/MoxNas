@@ -1,0 +1,56 @@
+# Prometheus configuration for MoxNAS monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # MoxNAS application metrics
+  - job_name: 'moxnas'
+    static_configs:
+      - targets: ['moxnas:8000']
+    metrics_path: '/api/system/metrics/'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # System metrics via node_exporter (if available)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    
+  # Redis metrics (if redis_exporter is available)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+    
+  # PostgreSQL metrics (if postgres_exporter is available)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+    
+  # Nginx metrics (if nginx-prometheus-exporter is available)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+    scrape_interval: 30s

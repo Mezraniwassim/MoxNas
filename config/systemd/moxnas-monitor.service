@@ -1,0 +1,32 @@
+[Unit]
+Description=MoxNAS System Monitor
+Documentation=https://github.com/moxnas/moxnas
+After=network.target moxnas.service
+
+[Service]
+Type=simple
+User=moxnas
+Group=moxnas
+WorkingDirectory=/opt/moxnas/scripts
+Environment=PATH=/opt/moxnas/venv/bin
+Environment=PYTHONPATH=/opt/moxnas/backend
+ExecStart=/opt/moxnas/venv/bin/python system-monitor.py monitor 60
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moxnas-monitor
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/moxnas /var/log/moxnas /var/lib/moxnas
+
+# Resource limits
+LimitNOFILE=1024
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

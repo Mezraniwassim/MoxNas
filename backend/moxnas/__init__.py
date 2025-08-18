@@ -1,1 +1,0 @@
-# MoxNas Django Application

@@ -1,0 +1,18 @@
+[Unit]
+Description=MoxNAS Nginx Configuration
+Documentation=https://github.com/moxnas/moxnas
+After=nginx.service
+Requires=nginx.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/bin/bash -c "ln -sf /opt/moxnas/config/nginx/moxnas-nginx.conf /etc/nginx/sites-available/moxnas && ln -sf /etc/nginx/sites-available/moxnas /etc/nginx/sites-enabled/moxnas"
+ExecStart=/bin/systemctl reload nginx
+ExecStop=/bin/bash -c "rm -f /etc/nginx/sites-enabled/moxnas"
+ExecStop=/bin/systemctl reload nginx
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

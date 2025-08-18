@@ -1,0 +1,14 @@
+# NFS exports configuration template for MoxNAS
+# This file is generated automatically - do not edit manually
+# Each line contains export path followed by client specifications and options
+
+{% for export in exports %}
+# Export: {{ export.name }} - {{ export.comment | default('NFS Export') }}
+{{ export.path }} {% for client in export.clients %}{{ client.network }}({{ client.options | join(',') }}){% if not loop.last %} {% endif %}{% endfor %}
+
+{% endfor %}
+
+# Example export formats:
+# /tank/data 192.168.1.0/24(rw,sync,no_subtree_check)
+# /tank/backup 10.0.0.0/8(ro,sync,no_subtree_check) 192.168.0.0/16(rw,sync,no_subtree_check)
+# /tank/public *(ro,sync,no_subtree_check,all_squash,anonuid=65534,anongid=65534)

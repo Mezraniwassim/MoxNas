@@ -1,0 +1,575 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2025 Wassim Mezrani
+# Author: Wassim Mezrani  
+# License: MIT | https://github.com/YOUR_USERNAME/MoxNAS/raw/main/LICENSE
+# Source: https://github.com/YOUR_USERNAME/MoxNAS
+
+# MoxNAS Installation Functions
+# Enhanced version of community-scripts install functions with MoxNAS-specific features
+
+# Check if already loaded
+[[ -n "${_INSTALL_FUNC_LOADED:-}" ]] && return
+_INSTALL_FUNC_LOADED=1
+
+# Color definitions
+color() {
+  YW=$(echo "\033[33m")
+  BL=$(echo "\033[36m")
+  RD=$(echo "\033[01;31m")
+  BGN=$(echo "\033[4;92m")
+  GN=$(echo "\033[1;92m")
+  DGN=$(echo "\033[32m")
+  CL=$(echo "\033[m")
+  BFR="\\r\\033[K"
+  HOLD=" "
+  TAB="  "
+  CM="${TAB}✓"
+  CROSS="${TAB}✗"
+  INFO="${TAB}[INFO]"
+  WARN="${TAB}[WARN]"
+}
+
+# Message functions
+msg_info() {
+  local msg="$1"
+  echo -ne " ${HOLD} ${YW}${msg}..."
+}
+
+msg_ok() {
+  local msg="$1"
+  echo -e "${BFR} ${CM} ${GN}${msg}${CL}"
+}
+
+msg_error() {
+  local msg="$1"
+  echo -e "${BFR} ${CROSS} ${RD}${msg}${CL}"
+}
+
+msg_warn() {
+  local msg="$1"
+  echo -e "${BFR} ${WARN} ${YW}${msg}${CL}"
+}
+
+# Silent execution
+silent() {
+  if [[ "$STD" == "silent" ]]; then
+    "$@" >/dev/null 2>&1
+  else
+    "$@"
+  fi
+}
+
+# Set STD mode for silent execution
+STD="${STD:-silent}"
+
+# Disable IPv6
+verb_ip6() {
+  if [ "$DISABLEIP6" == "yes" ]; then
+    echo "net.ipv6.conf.all.disable_ipv6 = 1" >>/etc/sysctl.conf
+    sysctl -p >/dev/null 2>&1
+  fi
+}
+
+# Container setup message
+setting_up_container() {
+  msg_info "Setting up Container OS"
+  msg_ok "Set up Container OS"
+  msg_info "Network Connected: ${BL}$(hostname -I)"
+  msg_ok "Network Connected"
+}
+
+# Enhanced network check with multiple fallback methods
+network_check() {
+  msg_info "Checking network connectivity"
+  
+  local connectivity_ok=false
+  local dns_ok=false
+  
+  # Test network connectivity with multiple methods
+  if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1; then
+    connectivity_ok=true
+  elif ping -c 1 -W 3 1.1.1.1 >/dev/null 2>&1; then
+    connectivity_ok=true
+  elif curl -s --connect-timeout 5 --max-time 10 http://www.google.com >/dev/null 2>&1; then
+    connectivity_ok=true
+  elif wget -q --spider --timeout=5 --tries=1 http://www.google.com >/dev/null 2>&1; then
+    connectivity_ok=true
+  fi
+  
+  if [ "$connectivity_ok" = false ]; then
+    msg_error "Network connectivity check failed"
+    echo -e "${CROSS} ${RD}No internet connectivity detected${CL}"
+    echo -e "${INFO} ${YW}Please check network configuration${CL}"
+    exit 1
+  fi
+  
+  # Test DNS resolution
+  if nslookup github.com >/dev/null 2>&1; then
+    dns_ok=true
+  elif host github.com >/dev/null 2>&1; then
+    dns_ok=true
+  elif dig +short github.com >/dev/null 2>&1; then
+    dns_ok=true
+  fi
+  
+  if [ "$dns_ok" = false ]; then
+    msg_warn "DNS resolution issues detected"
+    echo -e "${INFO} ${YW}Adding fallback DNS servers...${CL}"
+    
+    # Backup current resolv.conf
+    cp /etc/resolv.conf /etc/resolv.conf.backup
+    
+    # Add Google and Cloudflare DNS
+    echo "nameserver 8.8.8.8" >>/etc/resolv.conf
+    echo "nameserver 1.1.1.1" >>/etc/resolv.conf
+    
+    # Test DNS again
+    sleep 2
+    if nslookup github.com >/dev/null 2>&1; then
+      msg_ok "DNS resolution fixed with fallback servers"
+    else
+      msg_error "DNS resolution still failing after adding fallback servers"
+      exit 1
+    fi
+  fi
+  
+  msg_ok "Network connectivity verified"
+}
+
+# System update with error handling
+update_os() {
+  msg_info "Updating Container OS"
+  
+  # Update package lists with retry
+  retry_count=0
+  max_retries=3
+  
+  while [ $retry_count -lt $max_retries ]; do
+    if $STD apt-get update; then
+      break
+    else
+      retry_count=$((retry_count + 1))
+      if [ $retry_count -eq $max_retries ]; then
+        msg_error "Failed to update package lists after $max_retries attempts"
+        exit 1
+      fi
+      msg_warn "Package update failed, retrying... (attempt $retry_count/$max_retries)"
+      sleep 5
+    fi
+  done
+  
+  # Upgrade packages
+  $STD apt-get -y upgrade
+  msg_ok "Updated Container OS"
+}
+
+# Enhanced package installation with verification
+install_packages() {
+  local packages=("$@")
+  msg_info "Installing packages: ${packages[*]}"
+  
+  # Set environment variables to avoid interactive prompts
+  export DEBIAN_FRONTEND=noninteractive
+  export APT_LISTCHANGES_FRONTEND=none
+  
+  # Install packages with error handling
+  if $STD apt-get install -y "${packages[@]}"; then
+    msg_ok "Packages installed successfully"
+  else
+    msg_error "Failed to install packages: ${packages[*]}"
+    
+    # Try to fix broken packages
+    msg_info "Attempting to fix broken packages..."
+    $STD apt-get -y --fix-broken install
+    
+    # Retry installation
+    if $STD apt-get install -y "${packages[@]}"; then
+      msg_ok "Packages installed successfully after repair"
+    else
+      msg_error "Package installation failed permanently"
+      exit 1
+    fi
+  fi
+}
+
+# Service management with enhanced error handling
+manage_service() {
+  local action="$1"
+  local service="$2"
+  
+  case "$action" in
+    "enable")
+      if systemctl enable "$service" >/dev/null 2>&1; then
+        msg_ok "Service $service enabled"
+      else
+        msg_warn "Failed to enable service $service"
+        return 1
+      fi
+      ;;
+    "start")
+      if systemctl start "$service" >/dev/null 2>&1; then
+        msg_ok "Service $service started"
+      else
+        msg_warn "Failed to start service $service"
+        systemctl status "$service" --no-pager >/dev/null 2>&1 || true
+        return 1
+      fi
+      ;;
+    "restart")
+      if systemctl restart "$service" >/dev/null 2>&1; then
+        msg_ok "Service $service restarted"
+      else
+        msg_warn "Failed to restart service $service"
+        return 1
+      fi
+      ;;
+    "stop")
+      if systemctl stop "$service" >/dev/null 2>&1; then
+        msg_ok "Service $service stopped"
+      else
+        msg_warn "Failed to stop service $service"
+        return 1
+      fi
+      ;;
+    *)
+      msg_error "Unknown service action: $action"
+      return 1
+      ;;
+  esac
+  
+  return 0
+}
+
+# Directory creation with enhanced permissions
+create_directories() {
+  local dirs=("$@")
+  
+  for dir in "${dirs[@]}"; do
+    if mkdir -p "$dir" 2>/dev/null; then
+      msg_ok "Created directory: $dir"
+    else
+      msg_error "Failed to create directory: $dir"
+      exit 1
+    fi
+  done
+}
+
+# File download with verification
+download_file() {
+  local url="$1"
+  local dest="$2"
+  local expected_size="${3:-}"
+  
+  msg_info "Downloading $(basename "$dest")"
+  
+  # Try curl first, then wget as fallback
+  if command -v curl >/dev/null 2>&1; then
+    if curl -fsSL -o "$dest" "$url"; then
+      download_success=true
+    else
+      download_success=false
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if wget -qO "$dest" "$url"; then
+      download_success=true
+    else
+      download_success=false
+    fi
+  else
+    msg_error "Neither curl nor wget available for download"
+    exit 1
+  fi
+  
+  if [ "$download_success" = true ]; then
+    # Verify file size if provided
+    if [ -n "$expected_size" ]; then
+      actual_size=$(stat -c%s "$dest" 2>/dev/null || echo "0")
+      if [ "$actual_size" -lt "$expected_size" ]; then
+        msg_error "Downloaded file size ($actual_size) smaller than expected ($expected_size)"
+        rm -f "$dest"
+        exit 1
+      fi
+    fi
+    msg_ok "Downloaded $(basename "$dest")"
+  else
+    msg_error "Failed to download $(basename "$dest") from $url"
+    exit 1
+  fi
+}
+
+# Python environment setup with error handling
+setup_python_environment() {
+  local venv_path="$1"
+  local requirements_file="$2"
+  
+  msg_info "Setting up Python virtual environment"
+  
+  # Create virtual environment
+  if python3 -m venv "$venv_path"; then
+    msg_ok "Created Python virtual environment"
+  else
+    msg_error "Failed to create Python virtual environment"
+    exit 1
+  fi
+  
+  # Activate and upgrade pip
+  source "$venv_path/bin/activate"
+  
+  if pip install --upgrade pip >/dev/null 2>&1; then
+    msg_ok "Upgraded pip"
+  else
+    msg_warn "Failed to upgrade pip, continuing..."
+  fi
+  
+  # Install requirements if file exists
+  if [ -f "$requirements_file" ]; then
+    msg_info "Installing Python requirements"
+    if pip install -r "$requirements_file" >/dev/null 2>&1; then
+      msg_ok "Installed Python requirements"
+    else
+      msg_error "Failed to install Python requirements"
+      exit 1
+    fi
+  fi
+}
+
+# Node.js environment setup with memory optimization
+setup_nodejs_environment() {
+  local project_dir="$1"
+  local build_required="${2:-true}"
+  
+  if [ ! -d "$project_dir" ]; then
+    msg_warn "Node.js project directory not found: $project_dir"
+    return 1
+  fi
+  
+  cd "$project_dir"
+  
+  if [ ! -f "package.json" ]; then
+    msg_warn "package.json not found in $project_dir"
+    return 1
+  fi
+  
+  # Set memory limits to prevent OOM errors
+  export NODE_OPTIONS="--max-old-space-size=1024"
+  
+  msg_info "Installing Node.js dependencies"
+  
+  # Retry npm install with different memory settings
+  install_success=false
+  memory_limits=(1024 512 256)
+  
+  for limit in "${memory_limits[@]}"; do
+    export NODE_OPTIONS="--max-old-space-size=$limit"
+    
+    if npm install >/dev/null 2>&1; then
+      msg_ok "Node.js dependencies installed (memory limit: ${limit}MB)"
+      install_success=true
+      break
+    else
+      msg_warn "npm install failed with ${limit}MB memory limit"
+    fi
+  done
+  
+  if [ "$install_success" = false ]; then
+    msg_error "npm install failed with all memory configurations"
+    return 1
+  fi
+  
+  # Build if required
+  if [ "$build_required" = true ]; then
+    msg_info "Building Node.js project"
+    
+    build_success=false
+    for limit in "${memory_limits[@]}"; do
+      export NODE_OPTIONS="--max-old-space-size=$limit"
+      
+      if npm run build >/dev/null 2>&1; then
+        msg_ok "Node.js project built successfully (memory limit: ${limit}MB)"
+        build_success=true
+        break
+      else
+        msg_warn "npm build failed with ${limit}MB memory limit"
+      fi
+    done
+    
+    if [ "$build_success" = false ]; then
+      msg_error "npm build failed with all memory configurations"
+      return 1
+    fi
+  fi
+  
+  return 0
+}
+
+# Django setup and configuration
+setup_django() {
+  local django_dir="$1"
+  local venv_path="$2"
+  
+  if [ ! -d "$django_dir" ]; then
+    msg_error "Django directory not found: $django_dir"
+    exit 1
+  fi
+  
+  cd "$django_dir"
+  
+  if [ ! -f "manage.py" ]; then
+    msg_error "manage.py not found in $django_dir"
+    exit 1
+  fi
+  
+  # Activate virtual environment
+  source "$venv_path/bin/activate"
+  
+  # Create necessary directories
+  mkdir -p static media logs
+  
+  # Collect static files
+  msg_info "Collecting Django static files"
+  if python manage.py collectstatic --noinput >/dev/null 2>&1; then
+    msg_ok "Collected static files"
+  else
+    msg_warn "Failed to collect static files"
+  fi
+  
+  # Run migrations
+  msg_info "Running Django migrations"
+  if python manage.py migrate >/dev/null 2>&1; then
+    msg_ok "Migrations completed"
+  else
+    msg_error "Django migrations failed"
+    exit 1
+  fi
+}
+
+# Create systemd service with validation
+create_systemd_service() {
+  local service_name="$1"
+  local service_content="$2"
+  local service_file="/etc/systemd/system/${service_name}.service"
+  
+  msg_info "Creating systemd service: $service_name"
+  
+  # Write service file
+  echo "$service_content" >"$service_file"
+  
+  # Set proper permissions
+  chmod 644 "$service_file"
+  
+  # Reload systemd and enable service
+  systemctl daemon-reload
+  
+  if systemctl enable "$service_name" >/dev/null 2>&1; then
+    msg_ok "Created and enabled systemd service: $service_name"
+  else
+    msg_error "Failed to enable systemd service: $service_name"
+    exit 1
+  fi
+}
+
+# Verify service accessibility
+verify_service_accessibility() {
+  local service_name="$1"
+  local port="$2"
+  local max_retries="${3:-5}"
+  local retry_delay="${4:-10}"
+  
+  msg_info "Verifying $service_name accessibility on port $port"
+  
+  retry_count=0
+  while [ $retry_count -lt $max_retries ]; do
+    # Check if service is active
+    if systemctl is-active --quiet "$service_name"; then
+      # Check if port is listening
+      if ss -tlnp | grep -q ":$port"; then
+        # Test HTTP response if it's a web service
+        if [ "$port" = "8000" ] || [ "$port" = "80" ] || [ "$port" = "443" ]; then
+          if curl -f -s --connect-timeout 5 "http://localhost:$port" >/dev/null 2>&1; then
+            msg_ok "$service_name is accessible and responding on port $port"
+            return 0
+          fi
+        else
+          msg_ok "$service_name is listening on port $port"
+          return 0
+        fi
+      fi
+    fi
+    
+    retry_count=$((retry_count + 1))
+    if [ $retry_count -lt $max_retries ]; then
+      msg_warn "$service_name not ready, waiting... (attempt $retry_count/$max_retries)"
+      sleep "$retry_delay"
+    fi
+  done
+  
+  msg_error "$service_name accessibility verification failed after $max_retries attempts"
+  
+  # Show diagnostic information
+  msg_info "Service status:"
+  systemctl status "$service_name" --no-pager --lines=5 || true
+  
+  msg_info "Port status:"
+  ss -tlnp | grep ":$port" || echo "Port $port not found"
+  
+  return 1
+}
+
+# Cleanup function
+cleanup_installation() {
+  msg_info "Cleaning up installation"
+  
+  # Clean apt cache
+  $STD apt-get -y autoremove
+  $STD apt-get -y autoclean
+  
+  # Clear temporary files
+  rm -rf /tmp/* 2>/dev/null || true
+  rm -rf /var/tmp/* 2>/dev/null || true
+  
+  # Clear bash history for root
+  history -c 2>/dev/null || true
+  
+  msg_ok "Installation cleanup completed"
+}
+
+# Setup container motd and customization
+motd_ssh() {
+  msg_info "Setting up container MOTD"
+  
+  cat >/etc/motd <<'EOF'
+
+    __  ___          _   ___   ___   _____
+   /  |/  /___  _  _/ | / / | / _ | / ___/
+  / /|_/ / __ \| |/_/  |/ /  |/ __ |/ __ \ 
+ / /  / / /_/ />  </|  /|  / /_/ / /_/ /
+/_/  /_/\____/_/|_/ |_/ |_/_____/\____/ 
+                                        
+  Network Attached Storage for Proxmox
+
+EOF
+  
+  msg_ok "MOTD configured"
+}
+
+# Container customization
+customize() {
+  msg_info "Customizing container"
+  
+  # Set timezone if not already set
+  if [ ! -f /etc/timezone ]; then
+    echo "UTC" >/etc/timezone
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+  fi
+  
+  # Disable unnecessary services to save resources
+  local services_to_disable=("apache2" "exim4" "bluetooth" "cups")
+  for service in "${services_to_disable[@]}"; do
+    if systemctl is-enabled "$service" >/dev/null 2>&1; then
+      systemctl disable "$service" >/dev/null 2>&1 || true
+    fi
+  done
+  
+  msg_ok "Container customization completed"
+}

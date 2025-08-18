@@ -1,0 +1,25 @@
+[Unit]
+Description=MoxNAS System Monitor
+After=network.target moxnas.service
+Wants=moxnas.service
+
+[Service]
+Type=simple
+User={{ app_user|default('root') }}
+Group={{ app_group|default('root') }}
+WorkingDirectory=/opt/moxnas/backend
+Environment=PATH=/opt/moxnas/venv/bin
+Environment=DJANGO_SETTINGS_MODULE=moxnas.settings
+ExecStart=/opt/moxnas/venv/bin/python manage.py run_monitor
+Restart=always
+RestartSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/moxnas /var/log/moxnas
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

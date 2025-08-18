@@ -1,0 +1,66 @@
+# MoxNAS Environment Variables
+# This file sets environment variables for the MoxNAS application
+
+# Django settings
+export DJANGO_SETTINGS_MODULE=moxnas.settings
+export DJANGO_SECRET_KEY=""
+export DJANGO_DEBUG=False
+export DJANGO_ALLOWED_HOSTS="*"
+
+# Database settings
+export DATABASE_URL="sqlite:///opt/moxnas/backend/db.sqlite3"
+
+# Application paths
+export MOXNAS_HOME=/opt/moxnas
+export MOXNAS_CONFIG_DIR=/opt/moxnas/config
+export MOXNAS_DATA_DIR=/var/lib/moxnas
+export MOXNAS_LOG_DIR=/var/log/moxnas
+
+# Python path
+export PYTHONPATH="/opt/moxnas/backend:$PYTHONPATH"
+
+# Virtual environment
+export VIRTUAL_ENV=/opt/moxnas/venv
+export PATH="/opt/moxnas/venv/bin:$PATH"
+
+# Logging
+export LOG_LEVEL=INFO
+export DJANGO_LOG_LEVEL=INFO
+
+# Service settings
+export GUNICORN_WORKERS=3
+export GUNICORN_TIMEOUT=120
+export GUNICORN_BIND="127.0.0.1:8001"
+
+# Security
+export SECURE_SSL_REDIRECT=False
+export SECURE_BROWSER_XSS_FILTER=True
+export SECURE_CONTENT_TYPE_NOSNIFF=True
+export SECURE_HSTS_SECONDS=0
+
+# Storage
+export DEFAULT_STORAGE_BACKEND=filesystem
+export MEDIA_ROOT=/opt/moxnas/backend/media
+export STATIC_ROOT=/opt/moxnas/backend/staticfiles
+
+# Timezone
+export TZ=UTC
+
+# Locale
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
+# Performance
+export PYTHONOPTIMIZE=1
+export PYTHONUNBUFFERED=1
+
+# Monitoring
+export MONITOR_INTERVAL=60
+export ENABLE_SYSTEM_MONITORING=True
+
+# Feature flags
+export ENABLE_SAMBA=True
+export ENABLE_NFS=True
+export ENABLE_FTP=True
+export ENABLE_SNAPSHOTS=True
+export ENABLE_SMART_MONITORING=True

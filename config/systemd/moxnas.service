@@ -1,0 +1,33 @@
+[Unit]
+Description=MoxNAS Web Application
+Documentation=https://github.com/moxnas/moxnas
+After=network.target
+
+[Service]
+Type=simple
+User=moxnas
+Group=moxnas
+WorkingDirectory=/opt/moxnas/backend
+Environment=PATH=/opt/moxnas/venv/bin
+Environment=DJANGO_SETTINGS_MODULE=moxnas.settings
+ExecStart=/opt/moxnas/venv/bin/gunicorn --bind 127.0.0.1:8001 --workers 3 --timeout 120 --keep-alive 5 --max-requests 1000 --preload moxnas.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moxnas
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/moxnas /var/log/moxnas /var/lib/moxnas
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,239 @@
+# Multi-stage optimized Dockerfile for MoxNAS production deployment
+# This Dockerfile uses multi-stage builds to minimize final image size
+
+# ================================
+# Stage 1: Frontend Build
+# ================================
+FROM node:18-alpine AS frontend-builder
+
+# Set working directory
+WORKDIR /app/frontend
+
+# Copy package files
+COPY frontend/package*.json ./
+
+# Install dependencies with npm ci for faster, reliable builds
+RUN npm ci --only=production --no-audit --no-fund
+
+# Copy frontend source
+COPY frontend/ .
+
+# Build for production
+ENV NODE_ENV=production
+ENV GENERATE_SOURCEMAP=false
+RUN npm run build
+
+# ================================
+# Stage 2: Python Dependencies
+# ================================
+FROM python:3.9-slim AS python-builder
+
+# Install system dependencies for building Python packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    zlib1g-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip wheel
+
+# Copy requirements and install Python dependencies
+COPY backend/requirements.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Install production-specific packages
+RUN pip install --no-cache-dir gunicorn psycopg2-binary
+
+# ================================
+# Stage 3: Production Image
+# ================================
+FROM python:3.9-slim AS production
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/opt/venv/bin:$PATH"
+ENV DJANGO_SETTINGS_MODULE=moxnas.settings
+
+# Create app user for security
+RUN groupadd --gid 1000 moxnas && \
+    useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home moxnas
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    # Core system packages
+    curl \
+    wget \
+    nginx \
+    supervisor \
+    # NAS service packages
+    samba \
+    nfs-kernel-server \
+    vsftpd \
+    # System utilities
+    psutil \
+    procps \
+    net-tools \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# Copy Python virtual environment from builder
+COPY --from=python-builder /opt/venv /opt/venv
+
+# Create application directories
+RUN mkdir -p /app/backend /app/frontend /app/static /app/media \
+    /var/log/moxnas /var/lib/moxnas /etc/moxnas \
+    && chown -R moxnas:moxnas /app /var/log/moxnas /var/lib/moxnas /etc/moxnas
+
+# Set working directory
+WORKDIR /app
+
+# Copy backend application
+COPY --chown=moxnas:moxnas backend/ ./backend/
+
+# Copy built frontend from frontend-builder stage
+COPY --from=frontend-builder --chown=moxnas:moxnas /app/frontend/build ./frontend/build
+
+# Copy configuration files
+COPY --chown=moxnas:moxnas config/ ./config/
+
+# Copy deployment scripts
+COPY --chown=moxnas:moxnas scripts/ ./scripts/
+
+# Create optimized Django static files
+USER moxnas
+WORKDIR /app/backend
+
+# Collect static files
+RUN python manage.py collectstatic --noinput --clear
+
+# Create initial database (SQLite for container)
+RUN python manage.py migrate --noinput
+
+# Switch back to root for final setup
+USER root
+
+# Configure Nginx
+COPY config/nginx/moxnas-nginx.conf /etc/nginx/sites-available/moxnas
+RUN ln -sf /etc/nginx/sites-available/moxnas /etc/nginx/sites-enabled/moxnas \
+    && rm -f /etc/nginx/sites-enabled/default
+
+# Configure Supervisor
+COPY config/supervisor/moxnas.conf /etc/supervisor/conf.d/
+
+# Create startup script
+COPY <<EOF /app/entrypoint.sh
+#!/bin/bash
+set -e
+
+# Function to log messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Wait for database if needed (for external databases)
+if [ -n "\$DATABASE_HOST" ]; then
+    log "Waiting for database..."
+    while ! nc -z \$DATABASE_HOST \${DATABASE_PORT:-5432}; do
+        sleep 1
+    done
+    log "Database is ready"
+fi
+
+# Run database migrations
+log "Running database migrations..."
+cd /app/backend
+python manage.py migrate --noinput
+
+# Configure services
+log "Configuring services..."
+python manage.py configure_services --test-only
+
+# Create superuser if specified
+if [ "\$CREATE_SUPERUSER" = "true" ] && [ -n "\$SUPERUSER_USERNAME" ]; then
+    log "Creating superuser..."
+    python manage.py shell -c "
+from django.contrib.auth.models import User
+if not User.objects.filter(username='\$SUPERUSER_USERNAME').exists():
+    User.objects.create_superuser('\$SUPERUSER_USERNAME', '\$SUPERUSER_EMAIL', '\$SUPERUSER_PASSWORD')
+    print('Superuser created')
+else:
+    print('Superuser already exists')
+"
+fi
+
+# Start services
+log "Starting services..."
+exec supervisord -n -c /etc/supervisor/supervisord.conf
+EOF
+
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint.sh
+
+# Create Supervisor configuration
+COPY <<EOF /etc/supervisor/conf.d/moxnas.conf
+[supervisord]
+nodaemon=true
+user=root
+logfile=/var/log/supervisor/supervisord.log
+pidfile=/var/run/supervisord.pid
+
+[program:nginx]
+command=nginx -g "daemon off;"
+autostart=true
+autorestart=true
+user=root
+stdout_logfile=/var/log/supervisor/nginx.log
+stderr_logfile=/var/log/supervisor/nginx.log
+
+[program:moxnas]
+command=/opt/venv/bin/gunicorn --bind 127.0.0.1:8001 --workers 3 --timeout 300 --access-logfile /var/log/moxnas/access.log --error-logfile /var/log/moxnas/error.log moxnas.wsgi:application
+directory=/app/backend
+user=moxnas
+autostart=true
+autorestart=true
+environment=PATH="/opt/venv/bin",DJANGO_SETTINGS_MODULE="moxnas.settings"
+stdout_logfile=/var/log/supervisor/moxnas.log
+stderr_logfile=/var/log/supervisor/moxnas.log
+
+[program:moxnas-monitor]
+command=/opt/venv/bin/python manage.py run_monitor
+directory=/app/backend
+user=moxnas
+autostart=true
+autorestart=true
+environment=PATH="/opt/venv/bin",DJANGO_SETTINGS_MODULE="moxnas.settings"
+stdout_logfile=/var/log/supervisor/moxnas-monitor.log
+stderr_logfile=/var/log/supervisor/moxnas-monitor.log
+EOF
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/api/system/health/ || exit 1
+
+# Expose ports
+EXPOSE 8000 139 445 2049 21 20000-20100
+
+# Set volumes for persistent data
+VOLUME ["/var/log/moxnas", "/var/lib/moxnas", "/etc/moxnas", "/mnt/storage"]
+
+# Switch to app user for security
+USER moxnas
+
+# Set entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]

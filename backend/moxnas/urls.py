@@ -1,19 +1,31 @@
+"""
+URL configuration for MoxNAS project.
+"""
 from django.contrib import admin
-from django.urls import path, include, re_path
-from django.views.generic import TemplateView
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import TemplateView
+
+# API URL patterns
+api_patterns = [
+    path('storage/', include('apps.storage.urls')),
+    path('shares/', include('apps.shares.urls')),
+    path('users/', include('apps.users.urls')),
+    path('network/', include('apps.network.urls')),
+    path('services/', include('apps.services.urls')),
+    path('system/', include('apps.system.urls')),
+]
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/proxmox/', include('apps.proxmox.urls')),
-    path('api/containers/', include('apps.containers.urls')),
-    path('api/services/', include('apps.services.urls')),
-    path('api/storage/', include('apps.storage.urls')),
-    
+    path('api/', include(api_patterns)),
     # Serve React app for all other routes
-    re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
+    path('', TemplateView.as_view(template_name='index.html'), name='index'),
 ]
 
+# Serve static and media files
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

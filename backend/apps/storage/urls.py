@@ -1,20 +1,12 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
-app_name = 'storage'
+router = DefaultRouter()
+router.register(r'disks', views.DiskViewSet)
+router.register(r'mount-points', views.MountPointViewSet)
+router.register(r'pools', views.StoragePoolViewSet)
 
 urlpatterns = [
-    # Datasets
-    path('datasets/', views.DatasetListView.as_view(), name='dataset-list'),
-    path('datasets/<int:dataset_id>/', views.DatasetDetailView.as_view(), name='dataset-detail'),
-    
-    # Shares
-    path('shares/', views.ShareListView.as_view(), name='share-list'),
-    path('shares/<int:share_id>/', views.ShareDetailView.as_view(), name='share-detail'),
-    
-    # Share ACLs
-    path('shares/<int:share_id>/acls/', views.ShareACLView.as_view(), name='share-acls'),
-    
-    # Users
-    path('users/', views.UserAccountListView.as_view(), name='user-list'),
+    path('', include(router.urls)),
 ]

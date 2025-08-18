@@ -1,0 +1,293 @@
+#!/usr/bin/env bash
+
+# Core functions for MoxNAS installation and management
+
+# Error handling
+set -euo pipefail
+
+# Global variables
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly APP_NAME="MoxNAS"
+readonly APP_USER="moxnas"
+readonly APP_DIR="/opt/moxnas"
+readonly VENV_DIR="$APP_DIR/venv"
+readonly LOG_FILE="/var/log/moxnas-install.log"
+
+# Logging functions
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$LOG_FILE"
+}
+
+log_info() {
+    log "[INFO] $*"
+}
+
+log_error() {
+    log "[ERROR] $*"
+}
+
+log_warn() {
+    log "[WARN] $*"
+}
+
+# System checks
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        log_error "This script must be run as root"
+        exit 1
+    fi
+}
+
+check_os() {
+    if [[ ! -f /etc/debian_version ]]; then
+        log_error "This script requires Debian/Ubuntu"
+        exit 1
+    fi
+    
+    local debian_version
+    debian_version=$(cat /etc/debian_version)
+    log_info "Detected Debian version: $debian_version"
+}
+
+check_memory() {
+    local mem_mb
+    mem_mb=$(free -m | awk '/^Mem:/{print $2}')
+    
+    if [[ $mem_mb -lt 1024 ]]; then
+        log_warn "Less than 1GB RAM detected. MoxNAS may run slowly."
+    fi
+    
+    log_info "Available memory: ${mem_mb}MB"
+}
+
+check_disk_space() {
+    local available_gb
+    available_gb=$(df / | awk 'NR==2{printf "%.1f", $4/1024/1024}')
+    
+    if (( $(echo "$available_gb < 5" | bc -l) )); then
+        log_error "Insufficient disk space. At least 5GB required."
+        exit 1
+    fi
+    
+    log_info "Available disk space: ${available_gb}GB"
+}
+
+# Network functions
+get_ip_address() {
+    local ip
+    ip=$(hostname -I | awk '{print $1}')
+    echo "$ip"
+}
+
+check_port() {
+    local port="$1"
+    if ss -tlnp | grep -q ":$port "; then
+        log_warn "Port $port is already in use"
+        return 1
+    fi
+    return 0
+}
+
+# User management
+create_app_user() {
+    if ! id "$APP_USER" &>/dev/null; then
+        useradd -r -s /bin/bash -d "$APP_DIR" -m "$APP_USER"
+        usermod -aG sudo "$APP_USER"
+        log_info "Created user: $APP_USER"
+    else
+        log_info "User $APP_USER already exists"
+    fi
+}
+
+# Directory management
+setup_directories() {
+    local dirs=(
+        "$APP_DIR"
+        "$APP_DIR/backend"
+        "$APP_DIR/frontend"
+        "$APP_DIR/services"
+        "$APP_DIR/scripts"
+        "$APP_DIR/config"
+        "$APP_DIR/logs"
+        "$APP_DIR/data"
+        "/var/lib/moxnas"
+        "/var/log/moxnas"
+    )
+    
+    for dir in "${dirs[@]}"; do
+        mkdir -p "$dir"
+        chown "$APP_USER:$APP_USER" "$dir"
+        log_info "Created directory: $dir"
+    done
+}
+
+# Service management
+create_systemd_service() {
+    local service_name="$1"
+    local service_file="/etc/systemd/system/${service_name}.service"
+    
+    case "$service_name" in
+        "moxnas")
+            cat > "$service_file" << EOF
+[Unit]
+Description=MoxNAS Web Application
+After=network.target
+
+[Service]
+Type=simple
+User=$APP_USER
+Group=$APP_USER
+WorkingDirectory=$APP_DIR/backend
+Environment=PATH=$VENV_DIR/bin
+ExecStart=$VENV_DIR/bin/gunicorn --bind 127.0.0.1:8001 --workers 3 moxnas.wsgi:application
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            ;;
+        "moxnas-monitor")
+            cat > "$service_file" << EOF
+[Unit]
+Description=MoxNAS System Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=$APP_USER
+Group=$APP_USER
+WorkingDirectory=$APP_DIR/scripts
+Environment=PATH=$VENV_DIR/bin
+ExecStart=$VENV_DIR/bin/python system-monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            ;;
+    esac
+    
+    systemctl daemon-reload
+    systemctl enable "$service_name"
+    log_info "Created and enabled service: $service_name"
+}
+
+# Configuration management
+backup_config() {
+    local config_file="$1"
+    local backup_dir="/var/backups/moxnas"
+    
+    mkdir -p "$backup_dir"
+    
+    if [[ -f "$config_file" ]]; then
+        cp "$config_file" "$backup_dir/$(basename "$config_file").$(date +%Y%m%d_%H%M%S).bak"
+        log_info "Backed up configuration: $config_file"
+    fi
+}
+
+# Cleanup functions
+cleanup_on_exit() {
+    log_info "Cleaning up temporary files..."
+    # Add cleanup logic here
+}
+
+# Trap cleanup function
+trap cleanup_on_exit EXIT
+
+# Validation functions
+validate_installation() {
+    local errors=0
+    
+    # Check if user exists
+    if ! id "$APP_USER" &>/dev/null; then
+        log_error "User $APP_USER does not exist"
+        ((errors++))
+    fi
+    
+    # Check if directories exist
+    local required_dirs=("$APP_DIR" "$VENV_DIR")
+    for dir in "${required_dirs[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            log_error "Directory $dir does not exist"
+            ((errors++))
+        fi
+    done
+    
+    # Check if services are enabled
+    local services=("moxnas" "nginx")
+    for service in "${services[@]}"; do
+        if ! systemctl is-enabled "$service" &>/dev/null; then
+            log_error "Service $service is not enabled"
+            ((errors++))
+        fi
+    done
+    
+    if [[ $errors -eq 0 ]]; then
+        log_info "Installation validation passed"
+        return 0
+    else
+        log_error "Installation validation failed with $errors errors"
+        return 1
+    fi
+}
+
+# Performance optimization
+optimize_system() {
+    log_info "Applying system optimizations..."
+    
+    # Disable unnecessary services
+    local services_to_disable=("bluetooth" "cups" "avahi-daemon")
+    for service in "${services_to_disable[@]}"; do
+        if systemctl is-active "$service" &>/dev/null; then
+            systemctl disable "$service" 2>/dev/null || true
+            systemctl stop "$service" 2>/dev/null || true
+            log_info "Disabled service: $service"
+        fi
+    done
+    
+    # Optimize swappiness for server workload
+    echo "vm.swappiness=10" >> /etc/sysctl.conf
+    
+    log_info "System optimizations applied"
+}
+
+# Update functions
+check_for_updates() {
+    log_info "Checking for MoxNAS updates..."
+    # Placeholder for update checking logic
+    return 0
+}
+
+# Health check functions
+health_check() {
+    local status=0
+    
+    # Check if services are running
+    local services=("moxnas" "nginx")
+    for service in "${services[@]}"; do
+        if ! systemctl is-active "$service" &>/dev/null; then
+            log_error "Service $service is not running"
+            status=1
+        fi
+    done
+    
+    # Check if web interface is accessible
+    if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:8000 | grep -q "200"; then
+        log_error "Web interface is not accessible"
+        status=1
+    fi
+    
+    if [[ $status -eq 0 ]]; then
+        log_info "Health check passed"
+    else
+        log_error "Health check failed"
+    fi
+    
+    return $status
+}

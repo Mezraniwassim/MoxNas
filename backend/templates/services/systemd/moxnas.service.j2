@@ -1,0 +1,49 @@
+[Unit]
+Description=MoxNAS Web Application
+After=network.target postgresql.service mysql.service
+Wants=network.target
+
+[Service]
+Type=forking
+User={{ app_user|default('root') }}
+Group={{ app_group|default('root') }}
+WorkingDirectory=/opt/moxnas/backend
+Environment=PATH=/opt/moxnas/venv/bin
+Environment=DJANGO_SETTINGS_MODULE=moxnas.settings
+ExecStart=/opt/moxnas/venv/bin/gunicorn \
+    --bind 127.0.0.1:8001 \
+    --workers {{ workers|default('3') }} \
+    --worker-class {{ worker_class|default('sync') }} \
+    --timeout {{ timeout|default('300') }} \
+    --keepalive {{ keepalive|default('2') }} \
+    --max-requests {{ max_requests|default('1000') }} \
+    --max-requests-jitter {{ max_requests_jitter|default('100') }} \
+    --preload \
+    --pid /run/moxnas/moxnas.pid \
+    --daemon \
+    --access-logfile /var/log/moxnas/access.log \
+    --error-logfile /var/log/moxnas/error.log \
+    --log-level {{ log_level|default('info') }} \
+    moxnas.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+PIDFile=/run/moxnas/moxnas.pid
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/moxnas /var/log/moxnas /run/moxnas
+ProtectHome=true
+
+# Resource limits
+LimitNOFILE={{ nofile_limit|default('65536') }}
+LimitNPROC={{ nproc_limit|default('4096') }}
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
