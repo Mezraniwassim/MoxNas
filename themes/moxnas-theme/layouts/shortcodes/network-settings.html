@@ -1,0 +1,39 @@
+<div class="network-settings">
+    <div class="settings-header">
+        <h3>Network Configuration</h3>
+    </div>
+    <div class="settings-form">
+        <div class="form-section">
+            <h4>General Settings</h4>
+            <div class="form-group">
+                <label for="hostname">Hostname</label>
+                <input type="text" id="hostname" name="hostname" value="moxnas" />
+            </div>
+            <div class="form-group">
+                <label for="domain">Domain</label>
+                <input type="text" id="domain" name="domain" placeholder="local" />
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h4>DNS Settings</h4>
+            <div class="form-group">
+                <label for="dns1">Primary DNS</label>
+                <input type="text" id="dns1" name="dns1" value="8.8.8.8" />
+            </div>
+            <div class="form-group">
+                <label for="dns2">Secondary DNS</label>
+                <input type="text" id="dns2" name="dns2" value="8.8.4.4" />
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveNetworkSettings()">
+                <i class="fas fa-save"></i> Save Settings
+            </button>
+            <button class="btn btn-secondary" onclick="resetNetworkSettings()">
+                <i class="fas fa-undo"></i> Reset
+            </button>
+        </div>
+    </div>
+</div>

@@ -1,17 +1,35 @@
-#!/bin/bash
-# MoxNAS Local Installation Script
-# For testing and development purposes
-# Copyright (c) 2024 MoxNAS Contributors
-# License: MIT
+#!/usr/bin/env bash
+
+# MoxNAS One-Line Installation Script
+# Works on any Ubuntu 22.04+ or Debian 11+ system
+# Usage: curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install.sh | bash
+# Copyright (c) 2024 MoxNAS Contributors - License: MIT
 
 set -euo pipefail
 
-# Colors
+# Colors for output  
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+
+# Logging functions
+msg_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+msg_ok() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+msg_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+msg_warn() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
 
 # Configuration
 MOXNAS_VERSION="1.0.0"
@@ -20,35 +38,46 @@ WEB_DIR="/var/www/moxnas"
 CONFIG_DIR="/etc/moxnas"
 LOG_DIR="/var/log/moxnas"
 
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
+# Check if running as root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        log_error "This script must be run as root"
+        msg_error "This script must be run as root or with sudo"
         exit 1
     fi
 }
 
-check_system() {
-    log_info "Checking system requirements..."
+# Check system requirements
+check_requirements() {
+    msg_info "Checking system requirements..."
     
-    # Check if running on Ubuntu/Debian
-    if ! command -v apt-get >/dev/null 2>&1; then
-        log_error "This installer requires Ubuntu/Debian with apt-get"
+    # Check OS
+    if ! grep -E "(ubuntu|debian)" /etc/os-release &>/dev/null; then
+        msg_error "This script requires Ubuntu 22.04+ or Debian 11+"
+        exit 1
+    fi
+    
+    # Check available space (at least 2GB)
+    available_space=$(df / | awk 'NR==2 {print $4}')
+    if [[ $available_space -lt 2097152 ]]; then
+        msg_warn "Less than 2GB free space available. Installation may fail."
+    fi
+    
+    msg_ok "System requirements check passed"
+}
+
+# Main installation function
+main() {
+    echo "=================================="
+    echo "🚀 MoxNAS Installation Starting 🚀"
+    echo "=================================="
+    echo ""
+    
+    check_root
+    check_requirements
+    
+    # Check if apt-get is available
+    if ! command -v apt-get &> /dev/null; then
+        msg_error "This installer requires Ubuntu/Debian with apt-get"
         exit 1
     fi
     
@@ -57,15 +86,15 @@ check_system() {
     required_space=2097152  # 2GB in KB
     
     if [[ $available_space -lt $required_space ]]; then
-        log_error "Insufficient disk space. Required: 2GB, Available: $((available_space/1024/1024))GB"
+        msg_error "Insufficient disk space. Required: 2GB, Available: $((available_space/1024/1024))GB"
         exit 1
     fi
     
-    log_success "System requirements met"
+    msg_ok "System requirements met"
 }
 
 install_hugo() {
-    log_info "Installing Hugo static site generator..."
+    msg_info "Installing Hugo static site generator..."
     
     HUGO_VERSION="0.119.0"
     HUGO_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
@@ -78,15 +107,15 @@ install_hugo() {
     rm -f hugo.tar.gz
     
     if hugo version >/dev/null 2>&1; then
-        log_success "Hugo installed successfully"
+        msg_ok "Hugo installed successfully"
     else
-        log_error "Hugo installation failed"
+        msg_error "Hugo installation failed"
         exit 1
     fi
 }
 
 install_dependencies() {
-    log_info "Installing system dependencies..."
+    msg_info "Installing system dependencies..."
     
     apt-get update -qq
     
@@ -115,11 +144,11 @@ install_dependencies() {
         psutil \
         jinja2
     
-    log_success "Dependencies installed"
+    msg_ok "Dependencies installed"
 }
 
 setup_directories() {
-    log_info "Setting up directories..."
+    msg_info "Setting up directories..."
     
     # Create directories
     mkdir -p "$INSTALL_DIR"/{api,scripts,config}
@@ -137,11 +166,11 @@ setup_directories() {
     chmod 777 /mnt/shares/public /mnt/shares/ftp
     chown nobody:nogroup /mnt/shares/public /mnt/shares/ftp
     
-    log_success "Directories created"
+    msg_ok "Directories created"
 }
 
 install_moxnas() {
-    log_info "Installing MoxNAS application..."
+    msg_info "Installing MoxNAS application..."
     
     local current_dir=$(pwd)
     
@@ -160,17 +189,17 @@ install_moxnas() {
     if [[ -d "$current_dir/public" ]]; then
         cp -r "$current_dir/public/"* "$WEB_DIR/"
     else
-        log_info "Building Hugo site..."
+        msg_info "Building Hugo site..."
         cd "$current_dir"
         hugo --destination "$WEB_DIR"
         cd "$current_dir"
     fi
     
-    log_success "MoxNAS application installed"
+    msg_ok "MoxNAS application installed"
 }
 
 configure_nginx() {
-    log_info "Configuring nginx..."
+    msg_info "Configuring nginx..."
     
     # Copy nginx configuration
     cp config/nginx/moxnas.conf /etc/nginx/sites-available/
@@ -183,15 +212,15 @@ configure_nginx() {
     
     # Test configuration
     if nginx -t; then
-        log_success "Nginx configured successfully"
+        msg_ok "Nginx configured successfully"
     else
-        log_error "Nginx configuration test failed"
+        msg_error "Nginx configuration test failed"
         exit 1
     fi
 }
 
 configure_services() {
-    log_info "Configuring NAS services..."
+    msg_info "Configuring NAS services..."
     
     # Backup original configurations
     [[ -f /etc/samba/smb.conf ]] && cp /etc/samba/smb.conf /etc/samba/smb.conf.backup
@@ -225,11 +254,11 @@ EOF
     # Add public share to NFS exports
     echo "/mnt/shares/public *(rw,sync,no_subtree_check,all_squash,anonuid=65534,anongid=65534)" >> /etc/exports
     
-    log_success "NAS services configured"
+    msg_ok "NAS services configured"
 }
 
 setup_systemd() {
-    log_info "Setting up systemd services..."
+    msg_info "Setting up systemd services..."
     
     # Install systemd service files
     cp config/systemd/moxnas-api.service /etc/systemd/system/
@@ -244,11 +273,11 @@ setup_systemd() {
     systemctl enable nfs-kernel-server
     systemctl enable vsftpd
     
-    log_success "Systemd services configured"
+    msg_ok "Systemd services configured"
 }
 
 start_services() {
-    log_info "Starting services..."
+    msg_info "Starting services..."
     
     # Start MoxNAS API
     systemctl start moxnas-api
@@ -275,15 +304,15 @@ start_services() {
     done
     
     if [[ ${#failed_services[@]} -eq 0 ]]; then
-        log_success "All services started successfully"
+        msg_ok "All services started successfully"
     else
-        log_warning "Some services failed to start: ${failed_services[*]}"
-        log_info "Check service status with: systemctl status <service-name>"
+        msg_warn "Some services failed to start: ${failed_services[*]}"
+        msg_info "Check service status with: systemctl status <service-name>"
     fi
 }
 
 create_default_config() {
-    log_info "Creating default configuration..."
+    msg_info "Creating default configuration..."
     
     # Create users configuration
     cat > "$CONFIG_DIR/users.json" << 'EOF'
@@ -315,14 +344,14 @@ EOF
     chmod 600 "$CONFIG_DIR/users.json"
     chmod 644 "$CONFIG_DIR/shares.json"
     
-    log_success "Default configuration created"
+    msg_ok "Default configuration created"
 }
 
 show_completion_info() {
     local ip_address
     ip_address=$(hostname -I | awk '{print $1}' || echo "localhost")
     
-    log_success "MoxNAS installation completed successfully!"
+    msg_ok "MoxNAS installation completed successfully!"
     echo
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}                                   MoxNAS Ready                                     ${NC}"
@@ -350,7 +379,7 @@ show_completion_info() {
 }
 
 cleanup() {
-    log_info "Cleaning up..."
+    msg_info "Cleaning up..."
     
     # Remove temporary files
     rm -rf /tmp/hugo*
@@ -359,7 +388,7 @@ cleanup() {
     apt-get autoremove -y -qq
     apt-get autoclean -qq
     
-    log_success "Cleanup completed"
+    msg_ok "Cleanup completed"
 }
 
 main() {
@@ -372,9 +401,9 @@ main() {
     echo -e "${NC}"
     
     check_root
-    check_system
+    check_requirements
     
-    log_info "Starting MoxNAS installation..."
+    msg_info "Starting MoxNAS installation..."
     
     install_dependencies
     install_hugo
@@ -395,10 +424,10 @@ main() {
 
 # Handle errors
 handle_error() {
-    log_error "Installation failed at line $1"
-    log_error "Command: $2"
-    log_error "Exit code: $3"
-    log_info "Check the logs above for more details"
+    msg_error "Installation failed at line $1"
+    msg_error "Command: $2"
+    msg_error "Exit code: $3"
+    msg_info "Check the logs above for more details"
     exit 1
 }
 

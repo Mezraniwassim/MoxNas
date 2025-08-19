@@ -1,0 +1,51 @@
+<div class="user-list">
+    <div class="list-header">
+        <h3>System Users</h3>
+        <button class="btn btn-primary" onclick="showCreateUserModal()">
+            <i class="fas fa-user-plus"></i> Add User
+        </button>
+    </div>
+    <div class="users-table">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Groups</th>
+                    <th>Home Directory</th>
+                    <th>Shell</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersList">
+                <tr>
+                    <td><strong>root</strong></td>
+                    <td>Administrator</td>
+                    <td>root, wheel</td>
+                    <td>/root</td>
+                    <td>/bin/bash</td>
+                    <td>Active</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="editUser('root')">Edit</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>moxnas</strong></td>
+                    <td>MoxNAS Service User</td>
+                    <td>moxnas</td>
+                    <td>/home/moxnas</td>
+                    <td>/bin/bash</td>
+                    <td>Never</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="editUser('moxnas')">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteUser('moxnas')">Delete</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="7" class="loading">Loading more users...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

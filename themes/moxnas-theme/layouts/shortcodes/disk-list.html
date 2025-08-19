@@ -1,0 +1,47 @@
+<div class="disk-list">
+    <div class="list-header">
+        <h3>Storage Devices</h3>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="scanDisks()">
+                <i class="fas fa-search"></i> Scan Disks
+            </button>
+            <button class="btn btn-primary" onclick="showDiskModal()">
+                <i class="fas fa-plus"></i> Add Disk
+            </button>
+        </div>
+    </div>
+    <div class="disks-table">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Model</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                    <th>Health</th>
+                    <th>Temperature</th>
+                    <th>Mount Point</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="disksList">
+                <tr>
+                    <td><strong>/dev/sda</strong></td>
+                    <td>Virtual Disk</td>
+                    <td>100 GB</td>
+                    <td><span class="status-indicator active">Online</span></td>
+                    <td><span class="health-indicator healthy">Good</span></td>
+                    <td>35°C</td>
+                    <td>/</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="showDiskInfo('/dev/sda')">Info</button>
+                        <button class="btn btn-secondary btn-sm" onclick="formatDisk('/dev/sda')">Format</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="8" class="loading">Scanning for more disks...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
