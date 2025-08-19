@@ -27,10 +27,10 @@
   "dependencies": {},
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USERNAME/MoxNAS.git"
+    "url": "git+https://github.com/Mezraniwassim/MoxNas.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/MoxNAS/issues"
+    "url": "https://github.com/Mezraniwassim/MoxNas/issues"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/MoxNAS#readme"
+  "homepage": "https://github.com/Mezraniwassim/MoxNas#readme"
 }

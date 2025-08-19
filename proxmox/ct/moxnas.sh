@@ -26,11 +26,11 @@ function update_script() {
     check_container_storage
     check_container_resources
     if [[ ! -d /var ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-    RELEASE=$(curl -s https://api.github.com/repos/YOUR_USERNAME/MoxNAS/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
+    RELEASE=$(curl -s https://api.github.com/repos/Mezraniwassim/MoxNas/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
     if [[ ! -n "$RELEASE" ]]; then msg_error "Can't retrieve latest release!"; exit; fi
     if [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]] || [[ ! -f /opt/${APP}_version.txt ]]; then
         msg_info "Updating $APP LXC"
-        wget -q https://raw.githubusercontent.com/YOUR_USERNAME/MoxNAS/main/proxmox/install/moxnas-install.sh
+        wget -q https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/proxmox/install/moxnas-install.sh
         if [[ $? -ne 0 ]]; then msg_error "Download failed!"; exit; fi
         chmod +x moxnas-install.sh
         ./moxnas-install.sh

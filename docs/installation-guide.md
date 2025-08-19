@@ -35,7 +35,7 @@ This guide covers the complete installation process for MoxNAS, a TrueNAS-inspir
 For Proxmox VE users, use the community-scripts compliant helper script:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/MoxNAS/main/proxmox/ct/moxnas.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/proxmox/ct/moxnas.sh)"
 ```
 
 This will:
@@ -50,7 +50,7 @@ This will:
 For existing Ubuntu/Debian systems:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/MoxNAS/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install.sh | sudo bash
 ```
 
 ## Manual Installation
@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/MoxNAS/main/install.s
 ### Step 1: Download MoxNAS
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/MoxNAS.git
+git clone https://github.com/Mezraniwassim/MoxNas.git
 cd MoxNAS
 ```
 

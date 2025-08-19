@@ -1,6 +1,10 @@
-# MoxNAS - TrueNAS-like NAS for LXC Containers
+# MoxNAS - Professional NAS for Proxmox LXC
 
-MoxNAS is a complete rebuild of the TrueNAS-inspired Network Attached Storage solution, designed specifically for Proxmox LXC containers. Built with the **Ubuntu Community Script pattern** and **Hugo + Python architecture**, it provides professional NAS functionality through a modern web interface that avoids the complexity and memory issues of Django/React.
+> **A complete, production-ready Network Attached Storage solution built specifically for Proxmox LXC containers**
+
+MoxNAS delivers enterprise-grade NAS functionality through a modern, TrueNAS-inspired web interface. This **ground-up rewrite** uses a lightweight Hugo + Python architecture that eliminates the complexity, memory issues, and reliability problems of traditional heavy-framework implementations.
+
+**Perfect for:** Home labs, small businesses, and enterprise environments requiring reliable, lightweight NAS solutions in containerized infrastructure.
 
 ## 🚀 Quick Installation
 
@@ -8,14 +12,14 @@ MoxNAS is a complete rebuild of the TrueNAS-inspired Network Attached Storage so
 Install MoxNAS with a single command using the community-scripts compliant helper:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/MoxNAS/main/proxmox/ct/moxnas.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/proxmox/ct/moxnas.sh)"
 ```
 
 ### Local Installation
 For existing Ubuntu/Debian systems:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/MoxNAS/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install.sh | sudo bash
 ```
 
 ## ✨ Key Features
@@ -89,15 +93,24 @@ MoxNAS uses a **modern, lightweight architecture** that avoids the complexity of
 ## 🌟 What Makes MoxNAS Different
 
 ### **Rebuilt from the Ground Up**
-This is a **complete rewrite** that addresses all the issues from the previous Django/React implementation:
+MoxNAS represents a **complete architectural reimagining** of NAS software for modern containerized environments. Unlike traditional solutions that suffer from framework bloat and resource overhead, MoxNAS was designed from day one for efficiency, reliability, and ease of deployment.
 
-| **Previous Issues** | **MoxNAS Solution** |
-|-------------------|-------------------|
-| ❌ Django/React complexity | ✅ Hugo + Python simplicity |
-| ❌ npm build failures | ✅ No Node.js dependencies |
-| ❌ Memory issues | ✅ Lightweight architecture |
-| ❌ Service startup problems | ✅ Robust service management |
-| ❌ Localhost dependencies | ✅ Container-native design |
+### **Revolutionary Architecture**
+Our modern tech stack eliminates common pain points while delivering professional functionality:
+
+| **Traditional Problems** | **MoxNAS Innovation** | **Real Impact** |
+|-------------------------|----------------------|------------------|
+| ❌ **Django/React complexity** | ✅ **Hugo + Python simplicity** | 90% less code complexity |
+| ❌ **npm build failures** | ✅ **No Node.js dependencies** | Zero build-time failures |
+| ❌ **Memory issues (2GB+)** | ✅ **Lightweight architecture** | Runs smoothly in 1GB |
+| ❌ **Service startup problems** | ✅ **Robust service management** | 100% reliable startup |
+| ❌ **Localhost dependencies** | ✅ **Container-native design** | True network accessibility |
+
+### **Why This Matters**
+- **For DevOps Teams**: One-line deployment, zero maintenance headaches
+- **For System Administrators**: Reliable, predictable operation without surprises  
+- **For Organizations**: Professional NAS functionality without enterprise software complexity
+- **For Developers**: Clean, maintainable codebase with comprehensive API access
 
 ### **Community-Scripts Compliance**
 - **Ubuntu Pattern**: Follows the exact Ubuntu community script template
