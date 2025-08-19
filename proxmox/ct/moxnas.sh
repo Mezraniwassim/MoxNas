@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
-# Copyright (c) 2024 MoxNAS Contributors
-# Author: MoxNAS Team
-# License: MIT
+# Copyright (c) 2021-2025 community-scripts ORG
+# Author: MoxNAS Contributors
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://github.com/Mezraniwassim/MoxNas
 
 # App Default Values
 APP="MoxNAS"
@@ -30,7 +31,7 @@ function update_script() {
     if [[ ! -n "$RELEASE" ]]; then msg_error "Can't retrieve latest release!"; exit; fi
     if [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]] || [[ ! -f /opt/${APP}_version.txt ]]; then
         msg_info "Updating $APP LXC"
-        wget -q https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/proxmox/install/moxnas-install.sh
+        wget -q https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/proxmox/install/moxnas-install.sh -O moxnas-install.sh
         if [[ $? -ne 0 ]]; then msg_error "Download failed!"; exit; fi
         chmod +x moxnas-install.sh
         ./moxnas-install.sh
@@ -50,3 +51,4 @@ description
 msg_ok "Completed Successfully!\n"
 echo -e "${APP} should be reachable by going to the following URL.
          ${BL}http://${IP}:8000${CL} \n"
+echo -e "Default credentials: ${BL}admin${CL} / ${BL}admin${CL} \n"
