@@ -1,0 +1,14 @@
+{{ define "main" }}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1>{{ .Title }}</h1>
+        <div class="last-updated">
+            Last updated: <span id="lastUpdated">--</span>
+        </div>
+    </div>
+    
+    <div class="dashboard-content">
+        {{ .Content }}
+    </div>
+</div>
+{{ end }}

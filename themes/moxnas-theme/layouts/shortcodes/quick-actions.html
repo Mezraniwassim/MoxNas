@@ -1,0 +1,53 @@
+<div class="quick-actions">
+    <div class="action-card">
+        <div class="action-icon">
+            <i class="fas fa-plus"></i>
+        </div>
+        <div class="action-content">
+            <h4>Create Share</h4>
+            <p>Add a new SMB, NFS, or FTP share</p>
+            <button class="btn btn-primary" onclick="showCreateShareModal()">
+                Create
+            </button>
+        </div>
+    </div>
+    
+    <div class="action-card">
+        <div class="action-icon">
+            <i class="fas fa-user-plus"></i>
+        </div>
+        <div class="action-content">
+            <h4>Add User</h4>
+            <p>Create a new system user</p>
+            <button class="btn btn-primary" onclick="showCreateUserModal()">
+                Add User
+            </button>
+        </div>
+    </div>
+    
+    <div class="action-card">
+        <div class="action-icon">
+            <i class="fas fa-cog"></i>
+        </div>
+        <div class="action-content">
+            <h4>System Settings</h4>
+            <p>Configure system parameters</p>
+            <button class="btn btn-secondary" onclick="location.href='/system/'">
+                Settings
+            </button>
+        </div>
+    </div>
+    
+    <div class="action-card">
+        <div class="action-icon">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="action-content">
+            <h4>View Logs</h4>
+            <p>Check system and service logs</p>
+            <button class="btn btn-secondary" onclick="showLogsModal()">
+                View Logs
+            </button>
+        </div>
+    </div>
+</div>

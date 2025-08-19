@@ -1,0 +1,46 @@
+[Unit]
+Description=MoxNAS API Server
+Documentation=https://github.com/YOUR_USERNAME/MoxNAS
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/moxnas
+ExecStart=/usr/bin/python3 /opt/moxnas/api-server.py
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Environment variables
+Environment=PYTHONPATH=/opt/moxnas
+Environment=PYTHONUNBUFFERED=1
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+CPUQuota=50%
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/moxnas /etc/moxnas /mnt/shares
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moxnas-api
+
+# Health check
+ExecStartPre=/bin/mkdir -p /var/log/moxnas
+ExecStartPre=/bin/mkdir -p /etc/moxnas
+ExecStartPre=/bin/chown root:root /var/log/moxnas /etc/moxnas
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,28 @@
+[Unit]
+Description=MoxNAS Web Server (Nginx)
+Documentation=https://github.com/YOUR_USERNAME/MoxNAS
+After=network-online.target moxnas-api.service
+Wants=network-online.target
+Requires=moxnas-api.service
+
+[Service]
+Type=forking
+PIDFile=/var/run/nginx.pid
+ExecStartPre=/usr/sbin/nginx -t -c /etc/nginx/nginx.conf
+ExecStart=/usr/sbin/nginx -c /etc/nginx/nginx.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s QUIT $MAINPID
+KillMode=mixed
+KillSignal=SIGQUIT
+TimeoutStopSec=5
+Restart=on-failure
+RestartSec=5
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/nginx /var/lib/nginx /var/cache/nginx /var/run
+
+[Install]
+WantedBy=multi-user.target

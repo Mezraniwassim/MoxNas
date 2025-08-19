@@ -1,0 +1,32 @@
+<nav class="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
+            <i class="fas fa-server"></i>
+            <span>{{ .Site.Title }}</span>
+        </div>
+        <div class="version">v{{ .Site.Params.version }}</div>
+    </div>
+    
+    <ul class="sidebar-menu">
+        {{ range .Site.Menus.main }}
+        <li class="menu-item {{ if eq $.RelPermalink .URL }}active{{ end }}">
+            <a href="{{ .URL }}" class="menu-link">
+                <i class="fas fa-{{ .Params.icon | default "circle" }}"></i>
+                <span>{{ .Name }}</span>
+            </a>
+        </li>
+        {{ end }}
+    </ul>
+    
+    <div class="sidebar-footer">
+        <div class="system-status">
+            <div class="status-item">
+                <span class="status-dot online"></span>
+                <span>System Online</span>
+            </div>
+            <div class="status-item">
+                <span class="status-text" id="uptime">Loading...</span>
+            </div>
+        </div>
+    </div>
+</nav>
