@@ -7,8 +7,8 @@ Requires=postgresql.service redis-server.service
 
 [Service]
 Type=exec
-User=moxnas
-Group=moxnas
+User=root
+Group=root
 WorkingDirectory=/opt/moxnas
 Environment="PATH=/opt/moxnas/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONPATH=/opt/moxnas"
@@ -25,20 +25,19 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
 
-# Security settings (LXC compatible)
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
-PrivateTmp=yes
+# Security settings (relaxed for root access in LXC)
+NoNewPrivileges=no
+ProtectSystem=no
+ProtectHome=no
+ReadWritePaths=/
+PrivateTmp=no
 PrivateDevices=no
 ProtectKernelTunables=no
 ProtectKernelModules=no
-ProtectControlGroups=yes
-RestrictRealtime=yes
-LockPersonality=yes
+ProtectControlGroups=no
+RestrictRealtime=no
+LockPersonality=no
 MemoryDenyWriteExecute=no
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # Resource limits
 LimitNOFILE=65536

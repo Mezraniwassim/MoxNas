@@ -37,12 +37,74 @@ if ! command -v pct &> /dev/null; then
     exit 1
 fi
 
+# Function to detect available storage disks
+detect_storage_disks() {
+    local disks=()
+    msg_info "Detecting available storage disks"
+    
+    # Get all block devices that are not mounted and not used by the system
+    while IFS= read -r disk; do
+        # Skip if disk is mounted or is a system disk
+        if ! grep -q "^${disk}" /proc/mounts && ! pvdisplay "${disk}" &>/dev/null && ! grep -q "^${disk}" /proc/swaps; then
+            # Check if disk has a size > 1GB
+            local size=$(lsblk -b -n -o SIZE "${disk}" 2>/dev/null)
+            if [[ -n "$size" ]] && [[ $size -gt 1073741824 ]]; then
+                disks+=("$disk")
+            fi
+        fi
+    done < <(lsblk -d -n -o NAME | grep -E '^sd[b-z]$|^nvme[0-9]+n[1-9]$|^vd[b-z]$' | sed 's|^|/dev/|')
+    
+    if [[ ${#disks[@]} -gt 0 ]]; then
+        msg_ok "Found ${#disks[@]} available storage disk(s): ${disks[*]}"
+        printf '%s\n' "${disks[@]}"
+    else
+        msg_info "No additional storage disks detected"
+    fi
+}
+
+# Function to configure disk passthrough
+configure_disk_passthrough() {
+    local ctid=$1
+    shift
+    local disks=("$@")
+    
+    if [[ ${#disks[@]} -eq 0 ]]; then
+        msg_info "No disks to configure for passthrough"
+        return
+    fi
+    
+    msg_info "Configuring disk passthrough for container $ctid"
+    
+    for disk in "${disks[@]}"; do
+        if [[ -b "$disk" ]]; then
+            msg_info "Adding disk $disk to container"
+            
+            # Get major and minor device numbers
+            local major=$(stat -c "%t" "$disk")
+            local minor=$(stat -c "%T" "$disk")
+            major=$((0x$major))
+            minor=$((0x$minor))
+            
+            # Add device to container configuration
+            cat >> /etc/pve/lxc/${ctid}.conf << EOF
+
+# Storage disk: $disk
+lxc.cgroup2.devices.allow: b $major:$minor rwm
+lxc.mount.entry: $disk $disk none bind,optional,create=file
+EOF
+            msg_ok "Added $disk to container configuration"
+        else
+            msg_error "Disk $disk is not a valid block device"
+        fi
+    done
+}
+
 # Configuration variables with defaults
 CTID=${CTID:-$(pvesh get /cluster/nextid)}
 CT_HOSTNAME=${CT_HOSTNAME:-"moxnas"}
 STORAGE=${STORAGE:-"local-lvm"}
 TEMPLATE=${TEMPLATE:-"local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"}
-PASSWORD=${PASSWORD:-"$(openssl rand -base64 12)"}
+PASSWORD=${PASSWORD:-"moxnas1234"}
 CORES=${CORES:-4}
 MEMORY=${MEMORY:-4096}
 DISK_SIZE=${DISK_SIZE:-20}
@@ -50,6 +112,11 @@ NETWORK=${NETWORK:-"vmbr0"}
 IP_CONFIG=${IP_CONFIG:-"dhcp"}
 GITHUB_REPO=${GITHUB_REPO:-"https://github.com/Mezraniwassim/MoxNAS.git"}
 BRANCH=${BRANCH:-"master"}
+
+# Storage configuration
+STORAGE_DISKS=${STORAGE_DISKS:-""}  # Comma-separated list of disks to pass through (e.g., "/dev/sdb,/dev/sdc")
+AUTO_DETECT_DISKS=${AUTO_DETECT_DISKS:-"true"}  # Auto-detect available disks
+CREATE_STORAGE_POOL=${CREATE_STORAGE_POOL:-"true"}  # Automatically create storage pool
 
 # Check if template exists
 msg_info "Checking Debian template"
@@ -61,6 +128,25 @@ if ! pveam list local 2>/dev/null | grep -q "debian-12-standard_12.7-1_amd64.tar
 fi
 msg_ok "Template ready"
 
+# Handle storage disk configuration
+AVAILABLE_DISKS=()
+if [[ "$AUTO_DETECT_DISKS" == "true" ]]; then
+    mapfile -t AVAILABLE_DISKS < <(detect_storage_disks)
+fi
+
+# Parse manually specified disks
+if [[ -n "$STORAGE_DISKS" ]]; then
+    IFS=',' read -ra MANUAL_DISKS <<< "$STORAGE_DISKS"
+    for disk in "${MANUAL_DISKS[@]}"; do
+        disk=$(echo "$disk" | xargs)  # Trim whitespace
+        if [[ -b "$disk" ]]; then
+            AVAILABLE_DISKS+=("$disk")
+        else
+            msg_error "Specified disk $disk is not a valid block device"
+        fi
+    done
+fi
+
 # Display configuration
 echo -e "\n${GN}MoxNAS LXC Container Configuration:${CL}"
 echo -e "CT ID: ${YW}${CTID}${CL}"
@@ -70,6 +156,11 @@ echo -e "Cores: ${YW}${CORES}${CL}"
 echo -e "Memory: ${YW}${MEMORY}MB${CL}"
 echo -e "Disk: ${YW}${DISK_SIZE}GB${CL}"
 echo -e "Network: ${YW}${IP_CONFIG}${CL}"
+if [[ ${#AVAILABLE_DISKS[@]} -gt 0 ]]; then
+    echo -e "Storage Disks: ${YW}${AVAILABLE_DISKS[*]}${CL}"
+else
+    echo -e "Storage Disks: ${YW}None (using container filesystem)${CL}"
+fi
 echo ""
 
 # Create container
@@ -102,6 +193,11 @@ lxc.cgroup.devices.allow: a
 lxc.mount.auto: "proc:rw sys:rw"
 EOF
 
+# Configure disk passthrough if disks are available
+if [[ ${#AVAILABLE_DISKS[@]} -gt 0 ]]; then
+    configure_disk_passthrough "${CTID}" "${AVAILABLE_DISKS[@]}"
+fi
+
 msg_ok "Container configured"
 
 # Start container
@@ -130,6 +226,15 @@ msg_info "Updating system"
 silent apt-get update
 silent apt-get upgrade -y
 
+msg_info "Configuring locale"
+export DEBIAN_FRONTEND=noninteractive
+silent apt-get install -y locales
+echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
+silent locale-gen
+silent update-locale LANG=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 msg_info "Installing dependencies"
 silent apt-get install -y \
     curl wget git sudo mc \
@@ -139,25 +244,28 @@ silent apt-get install -y \
     mdadm smartmontools \
     nfs-kernel-server samba vsftpd \
     htop iotop build-essential \
-    libpq-dev libffi-dev libssl-dev openssl ufw
+    libpq-dev libffi-dev libssl-dev openssl ufw \
+    lvm2 parted gdisk dosfstools
 
 msg_info "Setting up PostgreSQL"
 systemctl start postgresql
 systemctl enable postgresql
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
-sudo -u postgres psql -c "CREATE DATABASE moxnas;"
-sudo -u postgres psql -c "CREATE USER moxnas WITH PASSWORD '$POSTGRES_PASSWORD';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE moxnas TO moxnas;"
-sudo -u postgres psql -c "ALTER USER moxnas CREATEDB;"
+sudo -u postgres LANG=C.UTF-8 LC_ALL=C.UTF-8 psql -c "CREATE DATABASE moxnas;"
+sudo -u postgres LANG=C.UTF-8 LC_ALL=C.UTF-8 psql -c "CREATE USER moxnas WITH PASSWORD '$POSTGRES_PASSWORD';"
+sudo -u postgres LANG=C.UTF-8 LC_ALL=C.UTF-8 psql -c "GRANT ALL PRIVILEGES ON DATABASE moxnas TO moxnas;"
+sudo -u postgres LANG=C.UTF-8 LC_ALL=C.UTF-8 psql -c "ALTER USER moxnas CREATEDB;"
 
 msg_info "Setting up Redis"
 REDIS_PASSWORD=$(openssl rand -base64 32)
-sed -i "s/# requirepass foobared/requirepass $REDIS_PASSWORD/" /etc/redis/redis.conf
+# Escape special characters for sed
+REDIS_PASSWORD_ESCAPED=$(printf '%s\n' "$REDIS_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
+sed -i "s|# requirepass foobared|requirepass $REDIS_PASSWORD_ESCAPED|" /etc/redis/redis.conf
 systemctl restart redis-server
 systemctl enable redis-server
 
-msg_info "Creating MoxNAS user"
-useradd -r -s /bin/bash -d /opt/moxnas -m moxnas
+msg_info "Setting up MoxNAS directory"
+mkdir -p /opt/moxnas
 
 msg_info "Installing MoxNAS application"
 cd /opt/moxnas
@@ -167,14 +275,11 @@ wget -O moxnas.tar.gz https://github.com/Mezraniwassim/MoxNas/archive/refs/heads
 tar -xzf moxnas.tar.gz --strip-components=1
 rm moxnas.tar.gz
 
-# Set ownership
-chown -R moxnas:moxnas /opt/moxnas
-
-# Create Python virtual environment
-sudo -u moxnas python3 -m venv venv
-sudo -u moxnas bash -c "source venv/bin/activate && pip install --upgrade pip"
-sudo -u moxnas bash -c "source venv/bin/activate && pip install gunicorn"
-sudo -u moxnas bash -c "source venv/bin/activate && pip install -r requirements.txt"
+# Create Python virtual environment (as root)
+python3 -m venv venv
+source venv/bin/activate && pip install --upgrade pip
+source venv/bin/activate && pip install gunicorn
+source venv/bin/activate && pip install -r requirements.txt
 
 # Create configuration file
 cat > /opt/moxnas/.env << EOF
@@ -189,19 +294,204 @@ SESSION_COOKIE_SECURE=true
 EOF
 
 chmod 600 /opt/moxnas/.env
-chown moxnas:moxnas /opt/moxnas/.env
 
 msg_info "Setting up storage directories"
 mkdir -p /mnt/storage /mnt/backups /var/log/moxnas
-chown -R moxnas:moxnas /mnt/storage /mnt/backups /var/log/moxnas
+
+# Initialize passed-through storage disks
+if ls /dev/sd[b-z] /dev/nvme[0-9]*n[1-9] /dev/vd[b-z] 2>/dev/null | head -1 >/dev/null; then
+    msg_info "Initializing storage disks for MoxNAS"
+    
+    # Create a simple storage detection script
+    cat > /opt/moxnas/initialize_storage.py << 'EOF'
+#!/usr/bin/env python3
+"""Initialize MoxNAS storage disks"""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+def run_command(cmd, check=True):
+    """Run command safely"""
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if check and result.returncode != 0:
+            print(f"Error running '{cmd}': {result.stderr}", file=sys.stderr)
+            return None
+        return result.stdout.strip()
+    except Exception as e:
+        print(f"Exception running '{cmd}': {e}", file=sys.stderr)
+        return None
+
+def detect_storage_disks():
+    """Detect available storage disks"""
+    disks = []
+    
+    # Check for common disk patterns
+    for pattern in ['/dev/sd[b-z]', '/dev/nvme[0-9]*n[1-9]', '/dev/vd[b-z]']:
+        output = run_command(f'ls {pattern} 2>/dev/null || true')
+        if output:
+            disks.extend(output.split('\n'))
+    
+    # Filter out mounted disks
+    available_disks = []
+    for disk in disks:
+        if disk and Path(disk).exists():
+            # Check if disk is mounted
+            mount_check = run_command(f'mount | grep "^{disk}"')
+            if not mount_check:
+                # Get disk size
+                size_output = run_command(f'lsblk -b -n -o SIZE {disk}')
+                if size_output and int(size_output) > 1073741824:  # > 1GB
+                    available_disks.append(disk)
+    
+    return available_disks
+
+def setup_storage_pool(disks):
+    """Set up basic storage configuration"""
+    if not disks:
+        print("No storage disks available")
+        return False
+    
+    print(f"Setting up storage with disks: {', '.join(disks)}")
+    
+    # Create a simple LVM setup for multiple disks or direct mount for single disk
+    if len(disks) == 1:
+        disk = disks[0]
+        print(f"Setting up single disk: {disk}")
+        
+        # Create partition table and partition
+        run_command(f'parted -s {disk} mklabel gpt')
+        run_command(f'parted -s {disk} mkpart primary 0% 100%')
+        
+        # Create filesystem
+        partition = f"{disk}1"
+        run_command(f'mkfs.ext4 -F {partition}')
+        
+        # Create mount point and mount
+        run_command('mkdir -p /mnt/moxnas-storage')
+        
+        # Add to fstab
+        uuid_output = run_command(f'blkid -s UUID -o value {partition}')
+        if uuid_output:
+            fstab_entry = f"UUID={uuid_output} /mnt/moxnas-storage ext4 defaults 0 2\n"
+            with open('/etc/fstab', 'a') as f:
+                f.write(fstab_entry)
+        
+        # Mount the filesystem
+        run_command('mount /mnt/moxnas-storage')
+        
+        # Update storage directory  
+        run_command('rm -rf /mnt/storage 2>/dev/null || true')
+        run_command('ln -sf /mnt/moxnas-storage /mnt/storage')
+        
+        print(f"Single disk storage configured: {partition} -> /mnt/storage")
+        
+    else:
+        print(f"Setting up LVM with {len(disks)} disks")
+        
+        # Create physical volumes
+        for disk in disks:
+            run_command(f'pvcreate -f {disk}')
+        
+        # Create volume group
+        run_command(f"vgcreate moxnas-vg {' '.join(disks)}")
+        
+        # Create logical volume (use 90% of space)
+        run_command('lvcreate -l 90%FREE -n storage moxnas-vg')
+        
+        # Create filesystem
+        run_command('mkfs.ext4 -F /dev/moxnas-vg/storage')
+        
+        # Create mount point and mount
+        run_command('mkdir -p /mnt/moxnas-storage')
+        
+        # Add to fstab
+        fstab_entry = "/dev/moxnas-vg/storage /mnt/moxnas-storage ext4 defaults 0 2\n"
+        with open('/etc/fstab', 'a') as f:
+            f.write(fstab_entry)
+        
+        # Mount the filesystem
+        run_command('mount /mnt/moxnas-storage')
+        
+        # Update storage directory  
+        run_command('rm -rf /mnt/storage 2>/dev/null || true')
+        run_command('ln -sf /mnt/moxnas-storage /mnt/storage')
+        
+        print(f"LVM storage configured: /dev/moxnas-vg/storage -> /mnt/storage")
+    
+    # Set permissions
+    run_command('chmod 755 /mnt/storage')
+    
+    return True
+
+if __name__ == '__main__':
+    print("MoxNAS Storage Initialization")
+    print("=" * 40)
+    
+    # Detect available disks
+    disks = detect_storage_disks()
+    
+    if not disks:
+        print("No additional storage disks detected.")
+        print("MoxNAS will use container filesystem for storage.")
+    else:
+        print(f"Found {len(disks)} storage disk(s): {', '.join(disks)}")
+        
+        # Set up storage
+        if setup_storage_pool(disks):
+            print("Storage initialization completed successfully!")
+        else:
+            print("Storage initialization failed!")
+            sys.exit(1)
+EOF
+    
+    chmod +x /opt/moxnas/initialize_storage.py
+    
+    # Run storage initialization
+    python3 /opt/moxnas/initialize_storage.py
+    
+    # Update MoxNAS database with detected storage
+    bash -c "cd /opt/moxnas && source venv/bin/activate && python -c '
+from app import create_app, db
+from app.storage.manager import storage_manager
+app = create_app(\"production\")
+with app.app_context():
+    try:
+        storage_manager.update_device_database()
+        print(\"Storage database updated successfully\")
+    except Exception as e:
+        print(f\"Warning: Could not update storage database: {e}\")
+'"
+    
+    msg_ok "Storage disks initialized and database updated"
+else
+    msg_info "No additional storage disks found, using container filesystem"
+fi
+
+chmod 755 /mnt/storage /mnt/backups /var/log/moxnas
 
 msg_info "Initializing database"
 cd /opt/moxnas
-sudo -u moxnas bash -c "source venv/bin/activate && python -c 'from app import create_app, db; app = create_app(\"production\"); app.app_context().push(); db.create_all()'"
+bash -c "source venv/bin/activate && python -c 'from app import create_app, db; app = create_app(\"production\"); app.app_context().push(); db.create_all()'"
 
-# Create admin user
-ADMIN_PASSWORD=$(openssl rand -base64 16)
-sudo -u moxnas bash -c "source venv/bin/activate && python -c '
+# Also run initial storage scan to populate the database
+msg_info "Running initial storage device scan"
+bash -c "cd /opt/moxnas && source venv/bin/activate && python -c '
+from app import create_app, db
+from app.storage.manager import storage_manager
+app = create_app(\"production\")
+with app.app_context():
+    try:
+        storage_manager.update_device_database()
+        print(\"Initial storage device scan completed\")
+    except Exception as e:
+        print(f\"Note: Initial storage scan will run after first login: {e}\")
+'"
+
+# Create admin user with fixed password
+ADMIN_PASSWORD="moxnas1234"
+bash -c "cd /opt/moxnas && source venv/bin/activate && python -c '
 from app import create_app, db
 from app.models import User, UserRole
 from werkzeug.security import generate_password_hash
@@ -224,7 +514,6 @@ with app.app_context():
 echo "Admin Username: admin" > /opt/moxnas/.admin_credentials
 echo "Admin Password: $ADMIN_PASSWORD" >> /opt/moxnas/.admin_credentials
 chmod 600 /opt/moxnas/.admin_credentials
-chown moxnas:moxnas /opt/moxnas/.admin_credentials
 
 msg_info "Configuring Nginx"
 # Generate self-signed SSL certificate
@@ -296,8 +585,8 @@ Requires=postgresql.service redis-server.service
 
 [Service]
 Type=exec
-User=moxnas
-Group=moxnas
+User=root
+Group=root
 WorkingDirectory=/opt/moxnas
 Environment="PATH=/opt/moxnas/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONPATH=/opt/moxnas"
@@ -313,19 +602,18 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
 
-# Security settings for LXC
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
-PrivateTmp=yes
+# Security settings for LXC (relaxed for root access)
+NoNewPrivileges=no
+ProtectSystem=no
+ProtectHome=no
+ReadWritePaths=/
+PrivateTmp=no
 PrivateDevices=no
 ProtectKernelTunables=no
 ProtectKernelModules=no
-ProtectControlGroups=yes
-RestrictRealtime=yes
-LockPersonality=yes
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectControlGroups=no
+RestrictRealtime=no
+LockPersonality=no
 
 # Resource limits
 LimitNOFILE=65536
@@ -352,8 +640,8 @@ Requires=postgresql.service redis-server.service
 
 [Service]
 Type=exec
-User=moxnas
-Group=moxnas
+User=root
+Group=root
 WorkingDirectory=/opt/moxnas
 Environment="PATH=/opt/moxnas/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONPATH=/opt/moxnas"
@@ -369,12 +657,12 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
 
-# Security settings
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
-PrivateTmp=yes
+# Security settings (relaxed for root access)
+NoNewPrivileges=no
+ProtectSystem=no
+ProtectHome=no
+ReadWritePaths=/
+PrivateTmp=no
 PrivateDevices=no
 ProtectKernelTunables=no
 ProtectKernelModules=no
@@ -401,8 +689,7 @@ systemctl start moxnas moxnas-worker
 
 msg_info "Setting up storage and shares"
 mkdir -p /mnt/storage /mnt/backups /srv/ftp
-chown moxnas:moxnas /mnt/storage /mnt/backups
-chown ftp:ftp /srv/ftp
+chmod 755 /mnt/storage /mnt/backups /srv/ftp
 
 # NFS configuration
 echo "/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
@@ -418,12 +705,14 @@ cat >> /etc/samba/smb.conf << 'EOF'
     browseable = yes
     writable = yes
     guest ok = no
-    valid users = moxnas
+    valid users = root
     create mask = 0755
     directory mask = 0755
+    force user = root
+    force group = root
 EOF
 
-echo -e "$ADMIN_PASSWORD\n$ADMIN_PASSWORD" | smbpasswd -a moxnas
+echo -e "$ADMIN_PASSWORD\n$ADMIN_PASSWORD" | smbpasswd -a root
 systemctl enable smbd nmbd
 systemctl start smbd nmbd
 
@@ -456,7 +745,7 @@ userlist_file=/etc/vsftpd.userlist
 userlist_deny=NO
 EOF
 
-echo "moxnas" > /etc/vsftpd.userlist
+echo "root" > /etc/vsftpd.userlist
 systemctl enable vsftpd
 systemctl start vsftpd
 
@@ -472,8 +761,133 @@ ufw allow 2049/tcp
 ufw allow 21/tcp
 ufw allow 10000:10100/tcp
 
+msg_info "Setting up automatic share mounting"
+# Get container IP address
+SERVER_IP=$(hostname -I | awk '{print $1}')
+
+# Create mount points for testing shares
+mkdir -p /mnt/test-smb /mnt/test-nfs /mnt/test-ftp
+
+# Install CIFS utilities for SMB mounting
+apt-get install -y cifs-utils
+
+# Create SMB credentials file
+cat > /etc/cifs-credentials << EOF
+username=root
+password=$ADMIN_PASSWORD
+domain=
+EOF
+chmod 600 /etc/cifs-credentials
+
+# Add entries to fstab for automatic mounting
+cat >> /etc/fstab << EOF
+
+# MoxNAS Share Mounts (for testing and access)
+//$SERVER_IP/moxnas-storage /mnt/test-smb cifs credentials=/etc/cifs-credentials,uid=0,gid=0,iocharset=utf8,file_mode=0755,dir_mode=0755,nofail 0 0
+$SERVER_IP:/mnt/storage /mnt/test-nfs nfs defaults,nofail 0 0
+EOF
+
+# Wait for services to be fully ready
+sleep 5
+
+# Mount the shares
+msg_info "Mounting network shares for testing"
+mount /mnt/test-smb 2>/dev/null || echo "SMB mount will be available after reboot"
+mount /mnt/test-nfs 2>/dev/null || echo "NFS mount will be available after reboot"
+
+# Create test files to verify shares work
+if mountpoint -q /mnt/test-smb; then
+    echo "SMB share mounted successfully" > /mnt/test-smb/smb-test.txt
+    msg_ok "SMB share mounted and tested"
+else
+    msg_info "SMB share will be mounted on next boot"
+fi
+
+if mountpoint -q /mnt/test-nfs; then
+    echo "NFS share mounted successfully" > /mnt/test-nfs/nfs-test.txt
+    msg_ok "NFS share mounted and tested"
+else
+    msg_info "NFS share will be mounted on next boot"
+fi
+
+# Create a script for manual mounting and testing
+cat > /opt/moxnas/mount-shares.sh << 'EOF'
+#!/bin/bash
+# MoxNAS Share Mounting Script
+
+echo "🔧 MoxNAS Share Mount Manager"
+echo "=========================="
+
+# Get current IP
+SERVER_IP=$(hostname -I | awk '{print $1}')
+echo "Container IP: $SERVER_IP"
+echo ""
+
+# Function to test mount
+test_mount() {
+    local mount_point=$1
+    local share_type=$2
+    
+    if mountpoint -q "$mount_point"; then
+        echo "✅ $share_type mounted at $mount_point"
+        if [ -w "$mount_point" ]; then
+            echo "   Write test: OK"
+        else
+            echo "   Write test: FAILED (read-only)"
+        fi
+    else
+        echo "❌ $share_type not mounted at $mount_point"
+    fi
+}
+
+# Check current mounts
+echo "📂 Current Share Status:"
+test_mount "/mnt/test-smb" "SMB"
+test_mount "/mnt/test-nfs" "NFS" 
+echo ""
+
+# Show usage
+echo "🚀 Manual Commands:"
+echo "Mount SMB:  mount /mnt/test-smb"
+echo "Mount NFS:  mount /mnt/test-nfs"
+echo "Unmount:    umount /mnt/test-smb /mnt/test-nfs"
+echo "List:       df -h | grep test"
+echo ""
+
+# Offer to remount
+if [ "$1" = "mount" ]; then
+    echo "🔄 Attempting to mount shares..."
+    mount /mnt/test-smb 2>/dev/null && echo "✅ SMB mounted" || echo "❌ SMB mount failed"
+    mount /mnt/test-nfs 2>/dev/null && echo "✅ NFS mounted" || echo "❌ NFS mount failed"
+fi
+
+if [ "$1" = "test" ]; then
+    echo "🧪 Testing write access..."
+    echo "Test from $(date)" > /mnt/test-smb/mount-test.txt 2>/dev/null && echo "✅ SMB write OK" || echo "❌ SMB write failed"
+    echo "Test from $(date)" > /mnt/test-nfs/mount-test.txt 2>/dev/null && echo "✅ NFS write OK" || echo "❌ NFS write failed"
+fi
+EOF
+
+chmod +x /opt/moxnas/mount-shares.sh
+
 # Create installation summary
 SERVER_IP=$(hostname -I | awk '{print $1}')
+
+# Get storage information
+STORAGE_INFO="Container filesystem only"
+if [[ -L /mnt/storage ]] && [[ -e /mnt/storage ]]; then
+    REAL_PATH=$(readlink -f /mnt/storage)
+    if [[ "$REAL_PATH" != "/mnt/storage" ]]; then
+        # Get storage size
+        STORAGE_SIZE=$(df -h /mnt/storage 2>/dev/null | awk 'NR==2{print $2}' || echo "Unknown")
+        if [[ -n "$STORAGE_SIZE" ]]; then
+            STORAGE_INFO="Dedicated storage: $STORAGE_SIZE ($REAL_PATH)"
+        else
+            STORAGE_INFO="Dedicated storage: $REAL_PATH"
+        fi
+    fi
+fi
+
 cat > /opt/moxnas/INSTALLATION_INFO.txt << EOF
 MoxNAS Installation Complete!
 =============================
@@ -485,16 +899,28 @@ Admin Password: $ADMIN_PASSWORD
 Database Password: $POSTGRES_PASSWORD
 Redis Password: $REDIS_PASSWORD
 
+Storage Configuration:
+$STORAGE_INFO
+
 Network Shares:
-- SMB: //$SERVER_IP/moxnas-storage (user: moxnas, pass: $ADMIN_PASSWORD)
+- SMB: //$SERVER_IP/moxnas-storage (user: root, pass: $ADMIN_PASSWORD)
 - NFS: $SERVER_IP:/mnt/storage
-- FTP: ftp://$SERVER_IP (user: moxnas, pass: $ADMIN_PASSWORD)
+- FTP: ftp://$SERVER_IP (user: root, pass: $ADMIN_PASSWORD)
+
+Storage Management:
+- Web Interface: Storage > Pools (create RAID arrays, manage disks)
+- CLI: /opt/moxnas/initialize_storage.py (re-run storage setup)
+- Direct access: /mnt/storage (primary storage location)
+
+Mounted Shares (inside container):
+- SMB Test Mount: /mnt/test-smb (auto-mounted via fstab)
+- NFS Test Mount: /mnt/test-nfs (auto-mounted via fstab)
+- Credentials: /etc/cifs-credentials (for SMB access)
 
 Installation Date: $(date)
 EOF
 
 chmod 600 /opt/moxnas/INSTALLATION_INFO.txt
-chown moxnas:moxnas /opt/moxnas/INSTALLATION_INFO.txt
 
 # Create welcome motd
 cat > /etc/motd << EOF
@@ -510,8 +936,19 @@ cat > /etc/motd << EOF
    🌐 Web Interface: https://$SERVER_IP
    👤 Username: admin
    🔑 Password: $ADMIN_PASSWORD
+   🗝️  Container Root: $PASSWORD
    
    📁 Installation Info: /opt/moxnas/INSTALLATION_INFO.txt
+   🔧 Share Mount Manager: /opt/moxnas/mount-shares.sh
+
+   📂 Test Mount Points:
+   • SMB: /mnt/test-smb
+   • NFS: /mnt/test-nfs
+   
+   Quick Commands:
+   • Check shares: /opt/moxnas/mount-shares.sh
+   • Mount shares: /opt/moxnas/mount-shares.sh mount
+   • Test shares: /opt/moxnas/mount-shares.sh test
 
 EOF
 
@@ -543,7 +980,7 @@ echo -e "${GN}🎉 MoxNAS Deployment Complete! 🎉${CL}"
 echo ""
 echo -e "${YW}Container Details:${CL}"
 echo -e "CT ID: ${GN}${CTID}${CL}"
-echo -e "Hostname: ${GN}${HOSTNAME}${CL}"
+echo -e "Hostname: ${GN}${CT_HOSTNAME}${CL}"
 echo -e "IP Address: ${GN}${CONTAINER_IP}${CL}"
 echo ""
 echo -e "${YW}Access Information:${CL}"
