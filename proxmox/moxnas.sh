@@ -71,14 +71,14 @@ msg_info "Installing MoxNAS Application"
 cd /opt/moxnas
 
 # Download and extract MoxNAS
-LATEST_VERSION=$(curl -s https://api.github.com/repos/moxnas/moxnas/releases/latest | grep tag_name | cut -d '"' -f 4)
+LATEST_VERSION=$(curl -s https://api.github.com/repos/Mezraniwassim/MoxNas/releases/latest | grep tag_name | cut -d '"' -f 4)
 if [ -z "$LATEST_VERSION" ]; then
     # Fallback: download from main branch if no releases
-    $STD wget -O moxnas.tar.gz https://github.com/moxnas/moxnas/archive/refs/heads/main.tar.gz
+    $STD wget -O moxnas.tar.gz https://github.com/Mezraniwassim/MoxNas/archive/refs/heads/master.tar.gz
     $STD tar -xzf moxnas.tar.gz --strip-components=1
     rm moxnas.tar.gz
 else
-    $STD wget -O moxnas.tar.gz https://github.com/moxnas/moxnas/archive/refs/tags/$LATEST_VERSION.tar.gz
+    $STD wget -O moxnas.tar.gz https://github.com/Mezraniwassim/MoxNas/archive/refs/tags/$LATEST_VERSION.tar.gz
     $STD tar -xzf moxnas.tar.gz --strip-components=1
     rm moxnas.tar.gz
 fi
