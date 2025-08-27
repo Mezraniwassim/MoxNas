@@ -39,7 +39,7 @@ fi
 
 # Configuration variables with defaults
 CTID=${CTID:-$(pvesh get /cluster/nextid)}
-HOSTNAME=${HOSTNAME:-"moxnas"}
+CT_HOSTNAME=${CT_HOSTNAME:-"moxnas"}
 STORAGE=${STORAGE:-"local-lvm"}
 TEMPLATE=${TEMPLATE:-"local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"}
 PASSWORD=${PASSWORD:-"$(openssl rand -base64 12)"}
@@ -51,7 +51,7 @@ IP_CONFIG=${IP_CONFIG:-"dhcp"}
 
 # Check if template exists
 msg_info "Checking Debian template"
-if ! pct template list | grep -q "debian-12-standard"; then
+if ! pveam list local | grep -q "debian-12-standard"; then
     msg_info "Downloading Debian 12 template"
     pveam update
     pveam download local debian-12-standard_12.7-1_amd64.tar.zst
@@ -61,7 +61,7 @@ msg_ok "Template ready"
 # Display configuration
 echo -e "\n${GN}MoxNAS LXC Container Configuration:${CL}"
 echo -e "CT ID: ${YW}${CTID}${CL}"
-echo -e "Hostname: ${YW}${HOSTNAME}${CL}"
+echo -e "Hostname: ${YW}${CT_HOSTNAME}${CL}"
 echo -e "Password: ${YW}${PASSWORD}${CL}"
 echo -e "Cores: ${YW}${CORES}${CL}"
 echo -e "Memory: ${YW}${MEMORY}MB${CL}"
@@ -74,9 +74,9 @@ msg_info "Creating LXC container"
 pct create ${CTID} ${TEMPLATE} \
     --arch amd64 \
     --cores ${CORES} \
-    --hostname ${HOSTNAME} \
+    --hostname ${CT_HOSTNAME} \
     --memory ${MEMORY} \
-    --net0 name=eth0,bridge=${NETWORK},firewall=1,gw=auto,ip=${IP_CONFIG},type=veth \
+    --net0 name=eth0,bridge=${NETWORK},firewall=1,ip=${IP_CONFIG},type=veth \
     --ostype debian \
     --password ${PASSWORD} \
     --rootfs ${STORAGE}:${DISK_SIZE} \
