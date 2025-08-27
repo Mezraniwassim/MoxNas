@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Network Shares - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2 mb-0"><i class="bi bi-share"></i> Network Shares</h1>
+            {% if current_user.is_admin() %}
+            <a href="{{ url_for('shares.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Create Share
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Shares Overview -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Shares</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_shares }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-share text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Active Shares</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_shares }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-check-circle text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">SMB Shares</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ shares.items | selectattr('protocol.value', 'equalto', 'smb') | list | length }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-windows text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">NFS Shares</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ shares.items | selectattr('protocol.value', 'equalto', 'nfs') | list | length }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-ubuntu text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Shares Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Network Shares</h6>
+            </div>
+            <div class="card-body">
+                {% if shares.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Protocol</th>
+                                <th>Dataset</th>
+                                <th>Access</th>
+                                <th>Status</th>
+                                <th>Connections</th>
+                                <th>Last Access</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for share in shares.items %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('shares.detail', share_id=share.id) }}" class="fw-bold">
+                                        {{ share.name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'primary' if share.protocol.value == 'smb' else 'success' if share.protocol.value == 'nfs' else 'warning' }} share-protocol-badge">
+                                        {{ share.protocol.value.upper() }}
+                                    </span>
+                                </td>
+                                <td>{{ share.dataset.name }}</td>
+                                <td>
+                                    {% if share.read_only %}
+                                        <span class="badge bg-secondary">Read-Only</span>
+                                    {% else %}
+                                        <span class="badge bg-info">Read-Write</span>
+                                    {% endif %}
+                                    {% if share.guest_access %}
+                                        <span class="badge bg-warning">Guest</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if share.status.value == 'active' else 'secondary' }}">
+                                        {{ share.status.value.title() }}
+                                    </span>
+                                </td>
+                                <td>{{ share.connections_count }}</td>
+                                <td>
+                                    {% if share.last_access %}
+                                        {{ share.last_access.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('shares.detail', share_id=share.id) }}" class="btn btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if current_user.is_admin() %}
+                                        <button class="btn btn-outline-{{ 'warning' if share.status.value == 'active' else 'success' }}" 
+                                                onclick="toggleShare({{ share.id }}, '{{ share.name }}')">
+                                            <i class="bi bi-{{ 'pause' if share.status.value == 'active' else 'play' }}"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" onclick="deleteShare({{ share.id }}, '{{ share.name }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                {% if shares.pages > 1 %}
+                <nav aria-label="Shares pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if shares.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('shares.index', page=shares.prev_num) }}">Previous</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in shares.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != shares.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('shares.index', page=page_num) }}">{{ page_num }}</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if shares.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('shares.index', page=shares.next_num) }}">Next</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-share text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-2">No Network Shares</h5>
+                    <p class="text-muted">Create your first network share to enable file sharing.</p>
+                    {% if current_user.is_admin() %}
+                    <a href="{{ url_for('shares.create') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Create Network Share
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Connections -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Active Connections</h6>
+            </div>
+            <div class="card-body">
+                <div id="connectionsTable">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading connection information...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load active connections
+function loadConnections() {
+    fetch('{{ url_for("shares.api_connections") }}')
+        .then(response => response.json())
+        .then(data => {
+            let html = '';
+            let hasConnections = false;
+            
+            // SMB Connections
+            if (data.smb && data.smb.length > 0) {
+                hasConnections = true;
+                html += '<h6 class="text-primary">SMB Connections</h6>';
+                html += '<div class="table-responsive mb-3">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>User</th><th>Machine</th><th>Protocol</th><th>PID</th></tr></thead>';
+                html += '<tbody>';
+                data.smb.forEach(conn => {
+                    html += `<tr><td>${conn.username}</td><td>${conn.machine}</td><td>${conn.protocol}</td><td>${conn.pid}</td></tr>`;
+                });
+                html += '</tbody></table></div>';
+            }
+            
+            // NFS Connections
+            if (data.nfs && data.nfs.length > 0) {
+                hasConnections = true;
+                html += '<h6 class="text-primary">NFS Connections</h6>';
+                html += '<div class="table-responsive mb-3">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>Client</th><th>Mount Path</th></tr></thead>';
+                html += '<tbody>';
+                data.nfs.forEach(conn => {
+                    html += `<tr><td>${conn.client}</td><td>${conn.mount_path}</td></tr>`;
+                });
+                html += '</tbody></table></div>';
+            }
+            
+            // FTP Connections
+            if (data.ftp && data.ftp.length > 0) {
+                hasConnections = true;
+                html += '<h6 class="text-primary">FTP Connections</h6>';
+                html += '<div class="table-responsive mb-3">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>User</th><th>PID</th><th>CPU %</th><th>Memory %</th></tr></thead>';
+                html += '<tbody>';
+                data.ftp.forEach(conn => {
+                    html += `<tr><td>${conn.user}</td><td>${conn.pid}</td><td>${conn.cpu}</td><td>${conn.mem}</td></tr>`;
+                });
+                html += '</tbody></table></div>';
+            }
+            
+            if (!hasConnections) {
+                html = '<div class="text-center py-3"><i class="bi bi-wifi-off text-muted" style="font-size: 2rem;"></i><h6 class="text-muted mt-2">No Active Connections</h6><p class="text-muted">No clients are currently connected to any shares.</p></div>';
+            }
+            
+            document.getElementById('connectionsTable').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading connections:', error);
+            document.getElementById('connectionsTable').innerHTML = '<div class="alert alert-warning">Failed to load connection information.</div>';
+        });
+}
+
+// Load connections on page load
+document.addEventListener('DOMContentLoaded', loadConnections);
+
+// Refresh connections every 30 seconds
+setInterval(loadConnections, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,274 @@
+{% extends \"base.html\" %}
+
+{% block title %}Dashboard - MoxNAS{% endblock %}
+
+{% block content %}
+<div class=\"row\">
+    <div class=\"col-12\">
+        <h1 class=\"h2 mb-4\"><i class=\"bi bi-speedometer2\"></i> System Dashboard</h1>
+    </div>
+</div>
+
+<!-- System Overview Cards -->
+<div class=\"row mb-4\">
+    <div class=\"col-xl-3 col-md-6 mb-4\">
+        <div class=\"card border-left-primary shadow h-100 py-2\">
+            <div class=\"card-body\">
+                <div class=\"row no-gutters align-items-center\">
+                    <div class=\"col mr-2\">
+                        <div class=\"text-xs font-weight-bold text-primary text-uppercase mb-1\">CPU Usage</div>
+                        <div class=\"h5 mb-0 font-weight-bold text-gray-800\">{{ \"%.1f\" | format(system_stats.cpu_percent) }}%</div>
+                    </div>
+                    <div class=\"col-auto\">
+                        <i class=\"bi bi-cpu text-gray-300\" style=\"font-size: 2rem;\"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class=\"col-xl-3 col-md-6 mb-4\">
+        <div class=\"card border-left-success shadow h-100 py-2\">
+            <div class=\"card-body\">
+                <div class=\"row no-gutters align-items-center\">
+                    <div class=\"col mr-2\">
+                        <div class=\"text-xs font-weight-bold text-success text-uppercase mb-1\">Memory Usage</div>
+                        <div class=\"h5 mb-0 font-weight-bold text-gray-800\">{{ \"%.1f\" | format(system_stats.memory.percent) }}%</div>
+                    </div>
+                    <div class=\"col-auto\">
+                        <i class=\"bi bi-memory text-gray-300\" style=\"font-size: 2rem;\"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class=\"col-xl-3 col-md-6 mb-4\">
+        <div class=\"card border-left-info shadow h-100 py-2\">
+            <div class=\"card-body\">
+                <div class=\"row no-gutters align-items-center\">
+                    <div class=\"col mr-2\">
+                        <div class=\"text-xs font-weight-bold text-info text-uppercase mb-1\">Storage Usage</div>
+                        <div class=\"h5 mb-0 font-weight-bold text-gray-800\">{{ \"%.1f\" | format((used_storage / total_storage * 100) if total_storage > 0 else 0) }}%</div>
+                    </div>
+                    <div class=\"col-auto\">
+                        <i class=\"bi bi-hdd text-gray-300\" style=\"font-size: 2rem;\"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class=\"col-xl-3 col-md-6 mb-4\">
+        <div class=\"card border-left-warning shadow h-100 py-2\">
+            <div class=\"card-body\">
+                <div class=\"row no-gutters align-items-center\">
+                    <div class=\"col mr-2\">
+                        <div class=\"text-xs font-weight-bold text-warning text-uppercase mb-1\">Active Shares</div>
+                        <div class=\"h5 mb-0 font-weight-bold text-gray-800\">{{ shares_summary.active }}</div>
+                    </div>
+                    <div class=\"col-auto\">
+                        <i class=\"bi bi-share text-gray-300\" style=\"font-size: 2rem;\"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class=\"row mb-4\">
+    <div class=\"col-xl-8 col-lg-7\">
+        <div class=\"card shadow mb-4\">
+            <div class=\"card-header py-3 d-flex flex-row align-items-center justify-content-between\">
+                <h6 class=\"m-0 font-weight-bold text-primary\">System Performance</h6>
+            </div>
+            <div class=\"card-body\">
+                <div class=\"chart-container\" style=\"position: relative; height: 300px;\">
+                    <canvas id=\"performanceChart\"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class=\"col-xl-4 col-lg-5\">
+        <div class=\"card shadow mb-4\">
+            <div class=\"card-header py-3\">
+                <h6 class=\"m-0 font-weight-bold text-primary\">Storage Pool Status</h6>
+            </div>
+            <div class=\"card-body\">
+                {% for pool in storage_pools %}
+                <div class=\"mb-3\">
+                    <div class=\"d-flex justify-content-between\">
+                        <span class=\"fw-bold\">{{ pool.name }}</span>
+                        <span class=\"badge bg-{{ 'success' if pool.status.value == 'healthy' else 'warning' if pool.status.value == 'degraded' else 'danger' }}\">
+                            {{ pool.status.value.title() }}
+                        </span>
+                    </div>
+                    <div class=\"progress mt-2\" style=\"height: 8px;\">
+                        <div class=\"progress-bar\" role=\"progressbar\" 
+                             style=\"width: {{ (pool.used_size / pool.total_size * 100) if pool.total_size else 0 }}%\">
+                        </div>
+                    </div>
+                    <small class=\"text-muted\">
+                        {{ \"%.1f\" | format((pool.used_size / (1024**3)) if pool.used_size else 0) }} GB / 
+                        {{ \"%.1f\" | format((pool.total_size / (1024**3)) if pool.total_size else 0) }} GB
+                    </small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Device Health and Recent Activity -->
+<div class=\"row\">
+    <div class=\"col-xl-6 col-lg-6\">
+        <div class=\"card shadow mb-4\">
+            <div class=\"card-header py-3\">
+                <h6 class=\"m-0 font-weight-bold text-primary\">Device Health Summary</h6>
+            </div>
+            <div class=\"card-body\">
+                <div class=\"row\">
+                    <div class=\"col-4 text-center\">
+                        <div class=\"text-success\">
+                            <i class=\"bi bi-check-circle\" style=\"font-size: 2rem;\"></i>
+                            <div class=\"fw-bold\">{{ devices_summary.healthy }}</div>
+                            <small>Healthy</small>
+                        </div>
+                    </div>
+                    <div class=\"col-4 text-center\">
+                        <div class=\"text-warning\">
+                            <i class=\"bi bi-exclamation-triangle\" style=\"font-size: 2rem;\"></i>
+                            <div class=\"fw-bold\">{{ devices_summary.warning }}</div>
+                            <small>Warning</small>
+                        </div>
+                    </div>
+                    <div class=\"col-4 text-center\">
+                        <div class=\"text-danger\">
+                            <i class=\"bi bi-x-circle\" style=\"font-size: 2rem;\"></i>
+                            <div class=\"fw-bold\">{{ devices_summary.failed }}</div>
+                            <small>Failed</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class=\"mt-3\">
+                    <a href=\"{{ url_for('storage.devices') }}\" class=\"btn btn-primary btn-sm\">
+                        <i class=\"bi bi-eye\"></i> View All Devices
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class=\"col-xl-6 col-lg-6\">
+        <div class=\"card shadow mb-4\">
+            <div class=\"card-header py-3\">
+                <h6 class=\"m-0 font-weight-bold text-primary\">Recent System Activity</h6>
+            </div>
+            <div class=\"card-body\">
+                <div class=\"list-group list-group-flush\">
+                    {% for log in recent_logs %}
+                    <div class=\"list-group-item d-flex justify-content-between align-items-start\">
+                        <div class=\"ms-2 me-auto\">
+                            <div class=\"fw-bold\">{{ log.category.title() }}</div>
+                            <small>{{ log.message[:60] }}{% if log.message|length > 60 %}...{% endif %}</small>
+                        </div>
+                        <span class=\"badge bg-{{ 'danger' if log.level.value == 'error' else 'warning' if log.level.value == 'warning' else 'primary' }} rounded-pill\">
+                            {{ log.level.value }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class=\"mt-3\">
+                    <a href=\"{{ url_for('monitoring.logs') }}\" class=\"btn btn-secondary btn-sm\">
+                        <i class=\"bi bi-list\"></i> View All Logs
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Real-time performance chart
+let performanceChart;
+
+function initPerformanceChart() {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    
+    performanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU %',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }, {
+                label: 'Memory %',
+                data: [],
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+}
+
+function updatePerformanceChart() {
+    fetch('{{ url_for(\"main.system_stats_api\") }}')
+        .then(response => response.json())
+        .then(data => {
+            const now = new Date().toLocaleTimeString();
+            
+            // Add new data point
+            performanceChart.data.labels.push(now);
+            performanceChart.data.datasets[0].data.push(data.cpu.percent);
+            performanceChart.data.datasets[1].data.push(data.memory.percent);
+            
+            // Keep only last 20 data points
+            if (performanceChart.data.labels.length > 20) {
+                performanceChart.data.labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+                performanceChart.data.datasets[1].data.shift();
+            }
+            
+            performanceChart.update('none');
+        })
+        .catch(error => console.error('Error updating performance chart:', error));
+}
+
+// Initialize chart and start updates
+document.addEventListener('DOMContentLoaded', function() {
+    initPerformanceChart();
+    
+    // Update every 5 seconds
+    setInterval(updatePerformanceChart, 5000);
+    
+    // Initial update
+    updatePerformanceChart();
+});
+</script>
+{% endblock %}

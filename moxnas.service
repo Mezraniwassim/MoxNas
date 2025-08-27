@@ -1,0 +1,57 @@
+[Unit]
+Description=MoxNAS Professional Network Attached Storage
+Documentation=https://github.com/your-org/moxnas
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=exec
+User=moxnas
+Group=moxnas
+WorkingDirectory=/opt/moxnas
+Environment="PATH=/opt/moxnas/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/moxnas"
+
+# Service management
+ExecStart=/opt/moxnas/venv/bin/python /opt/moxnas/moxnas-service.py daemon
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+# Process management
+Restart=always
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
+PrivateTmp=yes
+PrivateDevices=no
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=2G
+CPUQuota=200%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moxnas
+
+[Install]
+WantedBy=multi-user.target
+Alias=moxnas.service

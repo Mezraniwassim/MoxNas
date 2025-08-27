@@ -1,437 +1,483 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# MoxNAS One-Line Installation Script
-# Works on any Ubuntu 22.04+ or Debian 11+ system
-# Usage: curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install.sh | bash
-# Copyright (c) 2024 MoxNAS Contributors - License: MIT
+# MoxNAS Installation Script
+# Professional Network Attached Storage Solution for Proxmox LXC
 
-set -euo pipefail
+set -e
 
-# Colors for output  
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Colors for output
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+NC='\\033[0m' # No Color
 
-# Logging functions
-msg_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Logging function
+log() {
+    echo -e \"${GREEN}[INFO]${NC} $1\"
 }
 
-msg_ok() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+warn() {
+    echo -e \"${YELLOW}[WARN]${NC} $1\"
 }
 
-msg_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+error() {
+    echo -e \"${RED}[ERROR]${NC} $1\"
 }
-
-msg_warn() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-# Configuration
-MOXNAS_VERSION="1.0.0"
-INSTALL_DIR="/opt/moxnas"
-WEB_DIR="/var/www/moxnas"
-CONFIG_DIR="/etc/moxnas"
-LOG_DIR="/var/log/moxnas"
 
 # Check if running as root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        msg_error "This script must be run as root or with sudo"
-        exit 1
-    fi
-}
+if [[ $EUID -ne 0 ]]; then
+    error \"This script must be run as root\"
+    exit 1
+fi
 
-# Check system requirements
-check_requirements() {
-    msg_info "Checking system requirements..."
-    
-    # Check OS
-    if ! grep -E "(ubuntu|debian)" /etc/os-release &>/dev/null; then
-        msg_error "This script requires Ubuntu 22.04+ or Debian 11+"
-        exit 1
-    fi
-    
-    # Check available space (at least 2GB)
-    available_space=$(df / | awk 'NR==2 {print $4}')
-    if [[ $available_space -lt 2097152 ]]; then
-        msg_warn "Less than 2GB free space available. Installation may fail."
-    fi
-    
-    msg_ok "System requirements check passed"
-}
+# Check if running on supported OS
+if ! command -v apt-get &> /dev/null; then
+    error \"This installer only supports Debian/Ubuntu systems\"
+    exit 1
+fi
 
-# Main installation function
-main() {
-    echo "=================================="
-    echo "🚀 MoxNAS Installation Starting 🚀"
-    echo "=================================="
-    echo ""
-    
-    check_root
-    check_requirements
-    
-    # Check if apt-get is available
-    if ! command -v apt-get &> /dev/null; then
-        msg_error "This installer requires Ubuntu/Debian with apt-get"
-        exit 1
-    fi
-    
-    # Check available space
-    available_space=$(df / | awk 'NR==2 {print $4}')
-    required_space=2097152  # 2GB in KB
-    
-    if [[ $available_space -lt $required_space ]]; then
-        msg_error "Insufficient disk space. Required: 2GB, Available: $((available_space/1024/1024))GB"
-        exit 1
-    fi
-    
-    msg_ok "System requirements met"
-}
+# Configuration
+MOXNAS_USER=\"moxnas\"
+MOXNAS_HOME=\"/opt/moxnas\"
+MOXNAS_DB=\"moxnas\"
+MOXNAS_DB_USER=\"moxnas\"
+MOXNAS_DB_PASS=$(openssl rand -base64 32)
+REDIS_PASS=$(openssl rand -base64 32)
 
-install_hugo() {
-    msg_info "Installing Hugo static site generator..."
-    
-    HUGO_VERSION="0.119.0"
-    HUGO_URL="https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
-    
-    cd /tmp
-    wget -q "$HUGO_URL" -O hugo.tar.gz
-    tar -xzf hugo.tar.gz
-    mv hugo /usr/local/bin/
-    chmod +x /usr/local/bin/hugo
-    rm -f hugo.tar.gz
-    
-    if hugo version >/dev/null 2>&1; then
-        msg_ok "Hugo installed successfully"
-    else
-        msg_error "Hugo installation failed"
-        exit 1
-    fi
-}
+log \"Starting MoxNAS installation...\"
 
-install_dependencies() {
-    msg_info "Installing system dependencies..."
-    
-    apt-get update -qq
-    
-    # Core dependencies
-    apt-get install -y -qq \
-        curl \
-        wget \
-        unzip \
-        git \
-        nginx \
-        python3 \
-        python3-pip \
-        python3-venv \
-        samba \
-        nfs-kernel-server \
-        vsftpd \
-        sudo \
-        systemctl \
-        ca-certificates
-    
-    # Python packages
-    pip3 install --quiet --upgrade pip
-    pip3 install --quiet \
-        aiohttp \
-        aiofiles \
-        psutil \
-        jinja2
-    
-    msg_ok "Dependencies installed"
-}
+# Update system packages
+log \"Updating system packages...\"
+apt-get update
+apt-get upgrade -y
 
-setup_directories() {
-    msg_info "Setting up directories..."
-    
-    # Create directories
-    mkdir -p "$INSTALL_DIR"/{api,scripts,config}
-    mkdir -p "$WEB_DIR"
-    mkdir -p "$CONFIG_DIR"
-    mkdir -p "$LOG_DIR"
-    mkdir -p /mnt/shares/{public,ftp}
-    
-    # Set permissions
-    chown -R root:root "$INSTALL_DIR"
-    chown -R www-data:www-data "$WEB_DIR"
-    chown -R root:root "$CONFIG_DIR"
-    chown -R root:root "$LOG_DIR"
-    chmod 755 /mnt/shares
-    chmod 777 /mnt/shares/public /mnt/shares/ftp
-    chown nobody:nogroup /mnt/shares/public /mnt/shares/ftp
-    
-    msg_ok "Directories created"
-}
+# Install system dependencies
+log \"Installing system dependencies...\"
+apt-get install -y \\
+    python3 \\
+    python3-pip \\
+    python3-venv \\
+    python3-dev \\
+    postgresql \\
+    postgresql-contrib \\
+    redis-server \\
+    nginx \\
+    supervisor \\
+    mdadm \\
+    smartmontools \\
+    nfs-kernel-server \\
+    samba \\
+    vsftpd \\
+    curl \\
+    wget \\
+    git \\
+    htop \\
+    iotop \\
+    build-essential \\
+    libpq-dev \\
+    libffi-dev \\
+    libssl-dev
 
-install_moxnas() {
-    msg_info "Installing MoxNAS application..."
-    
-    local current_dir=$(pwd)
-    
-    # Copy API server
-    cp "$current_dir/api-server.py" "$INSTALL_DIR/"
-    chmod +x "$INSTALL_DIR/api-server.py"
-    
-    # Copy management scripts
-    cp -r "$current_dir/scripts/"* "$INSTALL_DIR/scripts/"
-    chmod +x "$INSTALL_DIR/scripts"/*/*.sh
-    
-    # Copy configuration templates
-    cp -r "$current_dir/config/templates" "$INSTALL_DIR/config/"
-    
-    # Install Hugo site if not already built
-    if [[ -d "$current_dir/public" ]]; then
-        cp -r "$current_dir/public/"* "$WEB_DIR/"
-    else
-        msg_info "Building Hugo site..."
-        cd "$current_dir"
-        hugo --destination "$WEB_DIR"
-        cd "$current_dir"
-    fi
-    
-    msg_ok "MoxNAS application installed"
-}
+# Create MoxNAS user
+log \"Creating MoxNAS user...\"
+if ! id \"$MOXNAS_USER\" &>/dev/null; then
+    useradd -r -s /bin/bash -d \"$MOXNAS_HOME\" -m \"$MOXNAS_USER\"
+fi
 
-configure_nginx() {
-    msg_info "Configuring nginx..."
-    
-    # Copy nginx configuration
-    cp config/nginx/moxnas.conf /etc/nginx/sites-available/
-    
-    # Remove default site
-    rm -f /etc/nginx/sites-enabled/default
-    
-    # Enable MoxNAS site
-    ln -sf /etc/nginx/sites-available/moxnas.conf /etc/nginx/sites-enabled/
-    
-    # Test configuration
-    if nginx -t; then
-        msg_ok "Nginx configured successfully"
-    else
-        msg_error "Nginx configuration test failed"
-        exit 1
-    fi
-}
+# Setup PostgreSQL
+log \"Setting up PostgreSQL database...\"
+sudo -u postgres createdb \"$MOXNAS_DB\" 2>/dev/null || true
+sudo -u postgres psql -c \"CREATE USER $MOXNAS_DB_USER WITH PASSWORD '$MOXNAS_DB_PASS';\" 2>/dev/null || true
+sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE $MOXNAS_DB TO $MOXNAS_DB_USER;\" 2>/dev/null || true
+sudo -u postgres psql -c \"ALTER USER $MOXNAS_DB_USER CREATEDB;\" 2>/dev/null || true
 
-configure_services() {
-    msg_info "Configuring NAS services..."
-    
-    # Backup original configurations
-    [[ -f /etc/samba/smb.conf ]] && cp /etc/samba/smb.conf /etc/samba/smb.conf.backup
-    [[ -f /etc/exports ]] && cp /etc/exports /etc/exports.backup
-    [[ -f /etc/vsftpd.conf ]] && cp /etc/vsftpd.conf /etc/vsftpd.conf.backup
-    
-    # Install default configurations
-    cp config/templates/smb.conf.template /etc/samba/smb.conf
-    cp config/templates/exports.template /etc/exports
-    cp config/templates/vsftpd.conf.template /etc/vsftpd.conf
-    
-    # Create default public share in Samba
-    cat >> /etc/samba/smb.conf << 'EOF'
+# Configure Redis
+log \"Configuring Redis...\"
+sed -i \"s/# requirepass foobared/requirepass $REDIS_PASS/\" /etc/redis/redis.conf
+systemctl restart redis-server
+systemctl enable redis-server
 
-[public]
-   comment = MoxNAS public share
-   path = /mnt/shares/public
-   browseable = yes
-   read only = no
-   guest ok = yes
-   create mask = 0755
-   directory mask = 0755
-   force user = nobody
-   force group = nogroup
-   map archive = no
-   store dos attributes = yes
-   vfs objects = catia fruit streams_xattr
-   fruit:time machine = no
+# Install MoxNAS application
+log \"Installing MoxNAS application...\"
+cd \"$MOXNAS_HOME\"
+
+# Copy application files
+if [ -d \"/tmp/moxnas\" ]; then
+    cp -r /tmp/moxnas/* .
+else
+    # If not copying from temp, assume we're in the source directory
+    cp -r * \"$MOXNAS_HOME\"/
+fi
+
+# Create Python virtual environment
+sudo -u \"$MOXNAS_USER\" python3 -m venv venv
+sudo -u \"$MOXNAS_USER\" bash -c \"source venv/bin/activate && pip install --upgrade pip\"
+sudo -u \"$MOXNAS_USER\" bash -c \"source venv/bin/activate && pip install -r requirements.txt\"
+
+# Create configuration file
+log \"Creating configuration file...\"
+cat > \"$MOXNAS_HOME\"/.env << EOF
+FLASK_ENV=production
+SECRET_KEY=$(openssl rand -base64 64)
+DATABASE_URL=postgresql://$MOXNAS_DB_USER:$MOXNAS_DB_PASS@localhost/$MOXNAS_DB
+REDIS_URL=redis://:$REDIS_PASS@localhost:6379/0
+CELERY_BROKER_URL=redis://:$REDIS_PASS@localhost:6379/0
+CELERY_RESULT_BACKEND=redis://:$REDIS_PASS@localhost:6379/0
+MOXNAS_ADMIN_EMAIL=admin@moxnas.local
+SESSION_COOKIE_SECURE=true
 EOF
+
+# Set permissions
+chown -R \"$MOXNAS_USER\":\"$MOXNAS_USER\" \"$MOXNAS_HOME\"
+chmod 600 \"$MOXNAS_HOME\"/.env
+
+# Initialize database
+log \"Initializing database...\"
+cd \"$MOXNAS_HOME\"
+sudo -u \"$MOXNAS_USER\" bash -c \"source venv/bin/activate && python -c 'from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()'\"
+
+# Create admin user
+log \"Creating admin user...\"
+ADMIN_PASSWORD=$(openssl rand -base64 16)
+sudo -u \"$MOXNAS_USER\" bash -c \"source venv/bin/activate && python -c '
+from app import create_app, db
+from app.models import User, UserRole
+app = create_app()
+app.app_context().push()
+admin = User(username=\"admin\", email=\"admin@moxnas.local\", role=UserRole.ADMIN)
+admin.set_password(\"$ADMIN_PASSWORD\")
+db.session.add(admin)
+db.session.commit()
+print(\"Admin user created with password: $ADMIN_PASSWORD\")
+'\"
+
+# Configure Nginx
+log \"Configuring Nginx...\"
+cat > /etc/nginx/sites-available/moxnas << EOF
+server {
+    listen 80;
+    server_name _;
     
-    # Add public share to NFS exports
-    echo "/mnt/shares/public *(rw,sync,no_subtree_check,all_squash,anonuid=65534,anongid=65534)" >> /etc/exports
-    
-    msg_ok "NAS services configured"
+    # Redirect HTTP to HTTPS
+    return 301 https://\\$server_name\\$request_uri;
 }
 
-setup_systemd() {
-    msg_info "Setting up systemd services..."
+server {
+    listen 443 ssl http2;
+    server_name _;
     
-    # Install systemd service files
-    cp config/systemd/moxnas-api.service /etc/systemd/system/
+    # SSL configuration - use self-signed cert for now
+    ssl_certificate /etc/ssl/certs/moxnas-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/moxnas-selfsigned.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
     
-    # Reload systemd
-    systemctl daemon-reload
+    # Security headers
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options DENY;
+    add_header X-XSS-Protection \"1; mode=block\";
+    add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains; preload\";
     
-    # Enable services
-    systemctl enable moxnas-api
-    systemctl enable nginx
-    systemctl enable smbd
-    systemctl enable nfs-kernel-server
-    systemctl enable vsftpd
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host \\$host;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\$scheme;
+        proxy_redirect off;
+        proxy_buffering off;
+    }
     
-    msg_ok "Systemd services configured"
-}
-
-start_services() {
-    msg_info "Starting services..."
-    
-    # Start MoxNAS API
-    systemctl start moxnas-api
-    sleep 2
-    
-    # Start web server
-    systemctl start nginx
-    
-    # Start NAS services
-    systemctl start smbd
-    systemctl start nfs-kernel-server
-    systemctl start vsftpd
-    
-    # Export NFS shares
-    exportfs -ra
-    
-    # Check service status
-    local failed_services=()
-    
-    for service in moxnas-api nginx smbd nfs-kernel-server vsftpd; do
-        if ! systemctl is-active --quiet "$service"; then
-            failed_services+=("$service")
-        fi
-    done
-    
-    if [[ ${#failed_services[@]} -eq 0 ]]; then
-        msg_ok "All services started successfully"
-    else
-        msg_warn "Some services failed to start: ${failed_services[*]}"
-        msg_info "Check service status with: systemctl status <service-name>"
-    fi
-}
-
-create_default_config() {
-    msg_info "Creating default configuration..."
-    
-    # Create users configuration
-    cat > "$CONFIG_DIR/users.json" << 'EOF'
-{
-    "admin": {
-        "password": "admin",
-        "role": "administrator",
-        "created": "2024-01-01T00:00:00.000Z"
+    location /static {
+        alias $MOXNAS_HOME/app/static;
+        expires 30d;
+        add_header Cache-Control \"public, no-transform\";
     }
 }
 EOF
-    
-    # Create shares configuration
-    cat > "$CONFIG_DIR/shares.json" << 'EOF'
-{
-    "shares": [
-        {
-            "name": "public",
-            "type": "smb",
-            "path": "/mnt/shares/public",
-            "active": true,
-            "guest_access": true
-        }
-    ]
+
+# Generate self-signed SSL certificate
+log \"Generating SSL certificate...\"
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
+    -keyout /etc/ssl/private/moxnas-selfsigned.key \\
+    -out /etc/ssl/certs/moxnas-selfsigned.crt \\
+    -subj \"/C=US/ST=State/L=City/O=MoxNAS/CN=moxnas.local\"
+
+# Enable Nginx site
+ln -sf /etc/nginx/sites-available/moxnas /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl restart nginx
+systemctl enable nginx
+
+# Configure Supervisor for MoxNAS services
+log \"Configuring Supervisor...\"
+cat > /etc/supervisor/conf.d/moxnas.conf << EOF
+[program:moxnas-web]
+command=$MOXNAS_HOME/venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 wsgi:app
+directory=$MOXNAS_HOME
+user=$MOXNAS_USER
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/moxnas-web.log
+
+[program:moxnas-worker]
+command=$MOXNAS_HOME/venv/bin/celery -A celery_worker.celery worker --loglevel=info
+directory=$MOXNAS_HOME
+user=$MOXNAS_USER
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/moxnas-worker.log
+
+[program:moxnas-beat]
+command=$MOXNAS_HOME/venv/bin/celery -A celery_worker.celery beat --loglevel=info
+directory=$MOXNAS_HOME
+user=$MOXNAS_USER
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/moxnas-beat.log
+EOF
+
+# Configure log rotation
+cat > /etc/logrotate.d/moxnas << EOF
+/var/log/supervisor/moxnas-*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 root root
+    postrotate
+        supervisorctl restart moxnas-web moxnas-worker moxnas-beat
+    endscript
+}
+
+$MOXNAS_HOME/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 $MOXNAS_USER $MOXNAS_USER
 }
 EOF
-    
-    # Set proper permissions
-    chmod 600 "$CONFIG_DIR/users.json"
-    chmod 644 "$CONFIG_DIR/shares.json"
-    
-    msg_ok "Default configuration created"
-}
 
-show_completion_info() {
-    local ip_address
-    ip_address=$(hostname -I | awk '{print $1}' || echo "localhost")
-    
-    msg_ok "MoxNAS installation completed successfully!"
-    echo
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}                                   MoxNAS Ready                                     ${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo
-    echo -e "${BLUE}Web Interface:${NC} http://${ip_address}:8000"
-    echo -e "${BLUE}Default Login:${NC} admin / admin"
-    echo
-    echo -e "${BLUE}Services:${NC}"
-    echo "  • SMB/CIFS: //$(hostname)/public or //${ip_address}/public"
-    echo "  • NFS: ${ip_address}:/mnt/shares/public"
-    echo "  • FTP: ftp://${ip_address} (anonymous access enabled)"
-    echo
-    echo -e "${BLUE}Management:${NC}"
-    echo "  • Service status: systemctl status moxnas-api"
-    echo "  • View logs: journalctl -u moxnas-api -f"
-    echo "  • Configuration: ${CONFIG_DIR}/"
-    echo
-    echo -e "${YELLOW}Important:${NC}"
-    echo "  • Change default password immediately"
-    echo "  • Configure firewall rules as needed"
-    echo "  • Check service logs for any issues"
-    echo
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-}
+# Create storage directories
+log \"Creating storage directories...\"
+mkdir -p /mnt/storage /mnt/backups /srv/ftp
+chown \"$MOXNAS_USER\":\"$MOXNAS_USER\" /mnt/storage /mnt/backups
+chown ftp:ftp /srv/ftp
 
-cleanup() {
-    msg_info "Cleaning up..."
-    
-    # Remove temporary files
-    rm -rf /tmp/hugo*
-    
-    # Clean package cache
-    apt-get autoremove -y -qq
-    apt-get autoclean -qq
-    
-    msg_ok "Cleanup completed"
-}
+# Configure NFS
+log \"Configuring NFS...\"
+echo \"/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)\" >> /etc/exports
+systemctl enable nfs-kernel-server
+systemctl start nfs-kernel-server
 
-main() {
-    echo -e "${BLUE}"
-    echo "╔═══════════════════════════════════════════════════════════════════╗"
-    echo "║                        MoxNAS Installer                          ║"
-    echo "║                   TrueNAS-like NAS for LXC                       ║"
-    echo "║                        Version ${MOXNAS_VERSION}                            ║"
-    echo "╚═══════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    
-    check_root
-    check_requirements
-    
-    msg_info "Starting MoxNAS installation..."
-    
-    install_dependencies
-    install_hugo
-    setup_directories
-    install_moxnas
-    configure_nginx
-    configure_services
-    setup_systemd
-    create_default_config
-    start_services
-    cleanup
-    
-    # Write version file
-    echo "$MOXNAS_VERSION" > /opt/MoxNAS_version.txt
-    
-    show_completion_info
-}
+# Configure Samba
+log \"Configuring Samba...\"
+cp /etc/samba/smb.conf /etc/samba/smb.conf.backup
+cat >> /etc/samba/smb.conf << EOF
 
-# Handle errors
-handle_error() {
-    msg_error "Installation failed at line $1"
-    msg_error "Command: $2"
-    msg_error "Exit code: $3"
-    msg_info "Check the logs above for more details"
-    exit 1
-}
+# MoxNAS Samba Configuration
+[global]
+    workgroup = WORKGROUP
+    security = user
+    map to guest = bad user
+    dns proxy = no
+    
+[moxnas-storage]
+    path = /mnt/storage
+    browseable = yes
+    writable = yes
+    guest ok = no
+    valid users = $MOXNAS_USER
+    create mask = 0755
+    directory mask = 0755
+EOF
 
-trap 'handle_error $LINENO "$BASH_COMMAND" $?' ERR
+# Add MoxNAS user to Samba
+echo -e \"$ADMIN_PASSWORD\\n$ADMIN_PASSWORD\" | smbpasswd -a \"$MOXNAS_USER\"
+systemctl enable smbd nmbd
+systemctl start smbd nmbd
 
-# Run main function
-main "$@"
+# Configure vsftpd
+log \"Configuring FTP...\"
+cp /etc/vsftpd.conf /etc/vsftpd.conf.backup
+cat > /etc/vsftpd.conf << EOF
+listen=NO
+listen_ipv6=YES
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+local_umask=022
+dirmessage_enable=YES
+use_localtime=YES
+xferlog_enable=YES
+connect_from_port_20=YES
+chroot_local_user=YES
+allow_writeable_chroot=YES
+secure_chroot_dir=/var/run/vsftpd/empty
+pam_service_name=vsftpd
+rsa_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+rsa_private_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+ssl_enable=YES
+pasv_enable=Yes
+pasv_min_port=10000
+pasv_max_port=10100
+user_sub_token=\\$USER
+local_root=/srv/ftp
+userlist_enable=YES
+userlist_file=/etc/vsftpd.userlist
+userlist_deny=NO
+EOF
+
+echo \"$MOXNAS_USER\" > /etc/vsftpd.userlist
+systemctl enable vsftpd
+systemctl start vsftpd
+
+# Start services
+log \"Starting MoxNAS services...\"
+supervisorctl reread
+supervisorctl update
+supervisorctl start moxnas-web moxnas-worker moxnas-beat
+
+# Configure firewall
+log \"Configuring firewall...\"
+ufw --force enable
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow ssh
+ufw allow http
+ufw allow https
+ufw allow 139,445/tcp  # Samba
+ufw allow 2049/tcp     # NFS
+ufw allow 21/tcp       # FTP
+ufw allow 10000:10100/tcp  # FTP passive
+
+# Create maintenance script
+cat > /usr/local/bin/moxnas-maintenance << 'EOF'
+#!/bin/bash
+# MoxNAS maintenance script
+
+# Update SMART data and run health checks
+cd /opt/moxnas
+sudo -u moxnas bash -c "source venv/bin/activate && python -c '
+from app import create_app
+from app.storage.manager import storage_manager
+from app.tasks import device_health_check, cleanup_old_alerts
+app = create_app()
+app.app_context().push()
+
+# Update device database
+storage_manager.update_device_database()
+
+# Run health checks
+device_health_check.delay()
+
+# Clean up old alerts (older than 30 days)
+cleanup_old_alerts.delay()
+
+print(\"Health checks initiated\")
+'"
+
+# Clean up old logs
+find /var/log/supervisor/ -name "moxnas-*.log.*" -mtime +30 -delete
+find /opt/moxnas/logs/ -name "*.log.*" -mtime +30 -delete
+
+# Clean up old backup files
+find /mnt/backups/ -type f -mtime +90 -delete 2>/dev/null || true
+
+# Update package cache and check for security updates
+apt update -qq
+security_updates=$(apt list --upgradable 2>/dev/null | grep -i security | wc -l)
+if [ $security_updates -gt 0 ]; then
+    echo "Warning: $security_updates security updates available"
+    echo "Run 'apt upgrade' to install security updates"
+fi
+
+echo "Maintenance completed at $(date)"
+EOF
+
+chmod +x /usr/local/bin/moxnas-maintenance
+
+# Add to cron
+echo \"0 2 * * * root /usr/local/bin/moxnas-maintenance >> /var/log/moxnas-maintenance.log 2>&1\" >> /etc/crontab
+
+# Final setup
+log \"Finalizing installation...\"
+systemctl daemon-reload
+systemctl restart supervisor
+
+# Display installation summary
+log \"Installation completed successfully!\"
+echo \"\"
+echo -e \"${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}\"
+echo -e \"${BLUE}║${NC}                     ${GREEN}MoxNAS Installation Complete${NC}                    ${BLUE}║${NC}\"
+echo -e \"${BLUE}╠══════════════════════════════════════════════════════════════╣${NC}\"
+echo -e \"${BLUE}║${NC} Web Interface: ${YELLOW}https://$(hostname -I | awk '{print $1}')${NC}                              ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC} Admin Username: ${YELLOW}admin${NC}                                        ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC} Admin Password: ${YELLOW}$ADMIN_PASSWORD${NC}                 ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}                                                              ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC} Storage Mount: ${YELLOW}/mnt/storage${NC}                                  ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC} Backup Mount:  ${YELLOW}/mnt/backups${NC}                                 ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}                                                              ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC} Services Status:                                             ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}   - Web Server: ${GREEN}Running${NC}                                       ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}   - Database:   ${GREEN}Running${NC}                                       ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}   - Redis:      ${GREEN}Running${NC}                                       ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}   - Workers:    ${GREEN}Running${NC}                                       ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC}                                                              ${BLUE}║${NC}\"
+echo -e \"${BLUE}║${NC} ${YELLOW}Please save the admin password and change it after login!${NC}    ${BLUE}║${NC}\"
+echo -e \"${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}\"
+echo \"\"
+
+log \"You can now access MoxNAS at https://$(hostname -I | awk '{print $1}')\"
+log \"For security, please change the admin password after first login.\"
+
+# Save credentials to file
+cat > \"$MOXNAS_HOME\"/INSTALLATION_INFO.txt << EOF
+MoxNAS Installation Information
+===============================
+
+Installation Date: $(date)
+Server IP: $(hostname -I | awk '{print $1}')
+Web Interface: https://$(hostname -I | awk '{print $1}')
+
+Admin Credentials:
+Username: admin
+Password: $ADMIN_PASSWORD
+
+Database:
+Database: $MOXNAS_DB
+Username: $MOXNAS_DB_USER
+Password: $MOXNAS_DB_PASS
+
+Redis Password: $REDIS_PASS
+
+Important Files:
+- Application: $MOXNAS_HOME
+- Configuration: $MOXNAS_HOME/.env
+- Logs: /var/log/supervisor/moxnas-*.log
+- Storage: /mnt/storage
+- Backups: /mnt/backups
+
+Service Management:
+- Restart all: supervisorctl restart moxnas-web moxnas-worker moxnas-beat
+- Check status: supervisorctl status
+- View logs: supervisorctl tail -f moxnas-web
+EOF
+
+chown \"$MOXNAS_USER\":\"$MOXNAS_USER\" \"$MOXNAS_HOME\"/INSTALLATION_INFO.txt
+chmod 600 \"$MOXNAS_HOME\"/INSTALLATION_INFO.txt
+
+log \"Installation information saved to $MOXNAS_HOME/INSTALLATION_INFO.txt\"
+
+exit 0

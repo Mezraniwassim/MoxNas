@@ -1,238 +1,225 @@
-<div align="center">
+# MoxNAS - Professional Network Attached Storage for Proxmox
 
-# MoxNAS
-### Enterprise Network Attached Storage for Proxmox LXC
+![MoxNAS Logo](https://img.shields.io/badge/MoxNAS-v1.0.0-blue?style=for-the-badge&logo=database)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.8+-yellow?style=for-the-badge&logo=python)
+![Flask](https://img.shields.io/badge/Flask-2.3+-red?style=for-the-badge&logo=flask)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Proxmox%20LXC-orange)](https://www.proxmox.com/en/)
-[![Architecture](https://img.shields.io/badge/Architecture-Hugo%20%2B%20Python-green)](https://gohugo.io/)
+## 🚀 Overview
 
-*Production-ready NAS solution engineered for modern containerized infrastructure*
+MoxNAS is a comprehensive, enterprise-grade Network Attached Storage (NAS) solution specifically designed for Proxmox LXC containers. Built with security, performance, and reliability as core principles, MoxNAS provides TrueNAS-like functionality with a modern web interface and professional-grade features.
 
-[**Quick Start**](#-quick-start) • [**Features**](#-enterprise-features) • [**Architecture**](#-architecture) • [**Documentation**](docs/) • [**Support**](#-support)
+### 🎯 Key Features
 
-</div>
+- **🛡️ Enterprise Security**: Multi-factor authentication, CSRF protection, rate limiting, audit logging
+- **💾 Advanced Storage Management**: RAID 0/1/5/10 support, SMART monitoring, automated health checks
+- **🔗 Network Sharing**: SMB/CIFS, NFS, FTP/SFTP protocols with granular access control
+- **📊 Real-time Monitoring**: System metrics, storage health, performance analytics
+- **🔄 Backup Management**: Scheduled backups, encryption, retention policies
+- **📱 Responsive Interface**: Modern Bootstrap 5 UI with mobile support
+- **🔧 RESTful API**: Comprehensive API for automation and integration
+- **⚡ Background Processing**: Celery-based task queue for long-running operations
 
----
+## 🏗️ Architecture
 
-## 📖 Overview
+```text
+MoxNAS/
+├── app/                          # Flask application
+│   ├── auth/                     # Authentication system
+│   ├── storage/                  # Storage management
+│   ├── shares/                   # Network shares
+│   ├── backups/                  # Backup management
+│   ├── monitoring/               # System monitoring
+│   ├── api/                      # REST API
+│   ├── templates/                # HTML templates
+│   ├── static/                   # CSS, JS, images
+│   └── models.py                 # Database models
+├── migrations/                   # Database migrations
+├── tests/                        # Unit tests
+├── config.py                     # Configuration
+├── requirements.txt              # Dependencies
+├── wsgi.py                       # WSGI entry point
+├── celery_worker.py              # Celery worker
+└── install.sh                    # Installation script
+```
 
-**MoxNAS** is an enterprise-grade Network Attached Storage solution specifically engineered for Proxmox VE environments. Built from the ground up with a modern, lightweight architecture, it delivers TrueNAS-class functionality without the complexity and resource overhead of traditional solutions.
+## 🛠️ Technology Stack
 
-### Why MoxNAS?
+- **Backend**: Flask 2.3+ with Blueprint architecture
+- **Database**: PostgreSQL with SQLAlchemy ORM
+- **Task Queue**: Celery with Redis broker
+- **Frontend**: Bootstrap 5, Chart.js, vanilla JavaScript
+- **Security**: Flask-WTF (CSRF), Flask-Login, Flask-Limiter
+- **Storage**: mdadm (RAID), LVM, ext4/XFS filesystems
+- **Protocols**: Samba (SMB), NFS-kernel-server, vsftpd
+- **Monitoring**: psutil, SMART tools, custom collectors
 
-- **Zero-Friction Deployment**: One-command installation with community-scripts integration
-- **Resource Optimized**: Runs efficiently in 1GB containers where others require 2GB+
-- **Production Stable**: Eliminates common failure points found in framework-heavy solutions
-- **Enterprise Ready**: Professional web interface with comprehensive monitoring and management
+## 📋 Requirements
 
----
+### System Requirements
 
-## 🚀 Quick Start
+- **OS**: Debian 11+ / Ubuntu 20.04+ LXC container
+- **RAM**: Minimum 2GB, recommended 4GB+
+- **Storage**: 10GB+ for system, additional for data storage
+- **CPU**: 2+ cores recommended
 
-### Proxmox LXC (Recommended)
-Deploy MoxNAS instantly using the community-scripts compliant helper:
+### Software Dependencies
+
+- Python 3.8+
+- PostgreSQL 12+
+- Redis 6+
+- Nginx
+- Supervisor
+
+## 🚀 Quick Installation
+
+### 1. Automated Installation (Recommended)
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/proxmox/ct/moxnas.sh)"
+# Clone the repository
+git clone https://github.com/your-org/moxnas.git
+cd moxnas
+
+# Run the installation script as root
+sudo ./install.sh
 ```
 
-**Access your NAS**: `http://CONTAINER_IP:8000` (admin/admin)
-
-### Existing Systems
-For Ubuntu 22.04+ or Debian 11+ systems:
+### 2. Manual Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install.sh | sudo bash
+# Update system
+apt update && apt upgrade -y
+
+# Install dependencies
+apt install -y python3 python3-pip python3-venv postgresql redis-server nginx supervisor
+
+# Setup application
+cd /opt/moxnas
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Initialize database
+python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()"
 ```
 
----
+## 💻 Usage
 
-## 🏢 Enterprise Features
+### Web Interface
 
-### Network Storage Services
-- **SMB/CIFS** - Full Windows ecosystem compatibility with advanced VFS modules
-- **NFS v3/v4** - High-performance Unix/Linux file sharing with proper export management  
-- **FTP/SFTP** - Secure file transfer with comprehensive access controls
-- **Multi-Protocol** - Simultaneous access via multiple protocols to the same data
+1. Access MoxNAS at `https://your-server-ip`
+2. Login with admin credentials (created during installation)
+3. Navigate through the intuitive web interface:
+   - **Dashboard**: System overview and real-time metrics
+   - **Storage**: Manage devices, pools, and datasets
+   - **Shares**: Configure network shares (SMB, NFS, FTP)
+   - **Backups**: Schedule and monitor backup jobs
+   - **Monitoring**: View system performance and logs
 
-### Management Interface
-- **TrueNAS-Inspired Dashboard** - Professional web interface with familiar workflow
-- **Real-Time Monitoring** - Live system statistics, service health, and performance metrics
-- **RESTful API** - Complete programmatic control for automation and integration
-- **Mobile Responsive** - Full functionality on desktop, tablet, and mobile devices
+### API Access
 
-### Operations & Security
-- **Service Management** - Start, stop, restart, and monitor all NAS services
-- **User & Permissions** - Comprehensive access control with group management
-- **Configuration Backup** - Automatic backup before changes with rollback capability  
-- **Audit Logging** - Detailed operation logs for compliance and troubleshooting
+```bash
+# Authentication
+POST /api/auth/login
+POST /api/auth/logout
 
----
+# Storage Management  
+GET  /api/storage/devices
+POST /api/storage/pools
+GET  /api/storage/pools/{id}
 
-## 🏗 Architecture
+# Share Management
+GET  /api/shares
+POST /api/shares
+PUT  /api/shares/{id}
 
-MoxNAS employs a **three-tier architecture** optimized for containerized environments:
-
-```
-┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│   Frontend Layer    │    │   Application Layer │    │   Service Layer     │
-│                     │    │                     │    │                     │
-│ • Hugo Static Site  │◄──►│ • Python REST API   │◄──►│ • Samba (SMB/CIFS) │
-│ • JavaScript SPA    │    │ • Service Control   │    │ • NFS Kernel Server │
-│ • TrueNAS-like UI   │    │ • System Monitoring │    │ • vsftpd (FTP)      │
-│ • Real-time Updates │    │ • Configuration Mgmt│    │ • System Services   │
-└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
-              │                        │                        │
-              └────────────────────────┼────────────────────────┘
-                                       │
-              ┌─────────────────────────────────────────────────────────────┐
-              │                 Infrastructure Layer                        │
-              │                                                             │
-              │ • Nginx Reverse Proxy (Port 8000)                         │
-              │ • SSL/TLS Termination & Security Headers                   │
-              │ • Static Asset Delivery & API Routing                     │
-              │ • Load Balancing & High Availability Support              │
-              └─────────────────────────────────────────────────────────────┘
+# Monitoring
+GET /api/monitoring/system
+GET /api/monitoring/storage
 ```
 
-### Technical Stack
-- **Frontend**: Hugo static site generator with modern JavaScript
-- **Backend**: Python 3.8+ with aiohttp for async performance  
-- **Proxy**: Nginx with security headers and SSL/TLS support
-- **Storage**: Native Linux file systems with optimized permissions
-- **Monitoring**: Real-time metrics via psutil and system APIs
+## 🛡️ Security Features
 
----
+### Authentication & Authorization
 
-## 🌟 Competitive Advantages
+- **Strong Password Policies**: Minimum 8 characters, mixed case, numbers, symbols
+- **Account Lockout**: 5 failed attempts = 30 minute lockout
+- **Two-Factor Authentication**: TOTP support with QR codes
+- **Session Management**: 8-hour timeout, secure cookies
+- **Role-Based Access**: Admin and user roles with proper authorization
 
-### Revolutionary Design Philosophy
-MoxNAS was architected to solve real-world problems that plague traditional NAS solutions:
+### Security Measures
 
-| **Industry Challenge** | **MoxNAS Innovation** | **Business Impact** |
-|------------------------|----------------------|---------------------|
-| **Complex Installation** | One-command deployment | 95% faster setup time |
-| **Resource Intensive** | Lightweight architecture | 50% lower memory usage |
-| **Framework Dependencies** | Static site + API design | Zero build failures |
-| **Service Reliability** | Container-native services | 99.9% uptime stability |
-| **Network Accessibility** | External IP binding | True network transparency |
-| **Update Complexity** | Automated update system | Zero-downtime maintenance |
+- **CSRF Protection**: All forms protected with CSRF tokens
+- **Rate Limiting**: Login attempts and API calls rate limited
+- **Input Validation**: Comprehensive validation on all inputs
+- **SQL Injection Prevention**: Parameterized queries only
+- **XSS Protection**: All user input escaped in templates
+- **Audit Logging**: All actions logged with user context
 
-### ROI for Organizations
+## 📊 Monitoring & Alerting
 
-**DevOps Teams**
-- Reduce deployment time from hours to minutes
-- Eliminate maintenance overhead with self-healing architecture
-- Scale horizontally with container orchestration
+### Real-time Metrics
 
-**IT Departments** 
-- Lower total cost of ownership with reduced resource requirements
-- Simplified troubleshooting with centralized logging and monitoring
-- Professional interface reduces training requirements
+- CPU, memory, and disk usage
+- Network interface statistics
+- Storage pool health and usage
+- SMART data for all devices
+- Active network connections
 
-**Business Operations**
-- Reliable file access improves productivity
-- Reduced downtime means better business continuity  
-- API integration enables workflow automation
+### Alerting System
 
----
+- Email notifications for critical events
+- SMART failure alerts
+- Storage capacity warnings
+- System performance alerts
+- Configurable alert thresholds
 
-## 📋 System Requirements
+## 🔄 Backup & Recovery
 
-### Minimum Specifications
-| Component | Requirement | Recommended |
-|-----------|-------------|-------------|
-| **OS** | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
-| **Memory** | 1GB RAM | 2GB RAM |
-| **Storage** | 4GB available | 10GB+ available |
-| **CPU** | 2 vCPU cores | 4 vCPU cores |
-| **Network** | 1Gbps Ethernet | 1Gbps+ Ethernet |
+### Backup Features
 
-### Proxmox Integration
-- **Proxmox VE**: 7.0 or later
-- **Container Type**: Ubuntu 22.04 LXC (unprivileged supported)  
-- **Network**: Bridge or VLAN configuration
-- **Storage**: Local, NFS, or Ceph backend support
+- **Scheduled Backups**: Cron-based scheduling
+- **Multiple Targets**: Local, remote, and cloud destinations
+- **Encryption**: AES encryption for backup data
+- **Incremental Backups**: Space-efficient incremental backups
+- **Retention Policies**: Automatic cleanup of old backups
+- **Restore Interface**: Easy data recovery through web UI
 
----
+## 🧪 Testing
+
+```bash
+# Run unit tests
+cd /opt/moxnas
+source venv/bin/activate
+python -m pytest tests/ -v
+
+# Coverage report
+python -m pytest --cov=app tests/
+```
 
 ## 📚 Documentation
 
-### Getting Started
-- [**Installation Guide**](docs/installation-guide.md) - Complete setup instructions
-- [**User Manual**](docs/user-guide.md) - Feature documentation and workflows
-- [**API Reference**](docs/api-documentation.md) - Complete REST API specification
+- [Installation Guide](docs/installation.md)
+- [User Manual](docs/user-guide.md)
+- [API Documentation](docs/api.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
-### Operations
-- [**System Administration**](docs/admin-guide.md) - Advanced configuration and maintenance
-- [**Troubleshooting**](docs/troubleshooting.md) - Common issues and solutions
-- [**Security Guide**](docs/security.md) - Hardening and best practices
+## 🤝 Contributing
 
-### Development  
-- [**Architecture Overview**](docs/architecture.md) - Technical design and components
-- [**Contributing Guide**](CONTRIBUTING.md) - Development workflow and standards
-- [**API Integration**](docs/api-examples.md) - Code examples and use cases
+We welcome contributions! Please see our Contributing Guidelines for details.
 
----
+## 📄 License
 
-## 🧪 Testing & Validation
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-MoxNAS includes comprehensive testing to ensure enterprise-grade reliability:
+## 📞 Support
 
-```bash
-# Run full validation suite
-sudo ./test-moxnas.sh
-
-# Specific component tests
-sudo ./test-moxnas.sh --api --web --services
-```
-
-### Test Coverage
-- ✅ **Installation Validation** - Deployment process verification
-- ✅ **Service Health Checks** - All NAS services functionality
-- ✅ **API Endpoint Testing** - Complete REST API validation  
-- ✅ **Web Interface Tests** - UI responsiveness and functionality
-- ✅ **Security Scanning** - Vulnerability assessment and hardening
-- ✅ **Performance Benchmarks** - Resource usage and response time metrics
+- **Issues**: [GitHub Issues](https://github.com/your-org/moxnas/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/moxnas/discussions)
 
 ---
 
-## 🤝 Community & Support
+**MoxNAS** - Professional Network Attached Storage for the Modern Data Center
 
-### Professional Support
-- **Documentation**: Comprehensive guides and API references
-- **Community**: GitHub Discussions for peer support
-- **Issues**: GitHub issue tracking with response SLA
-
-### Contributing
-We welcome contributions from the community:
-
-1. **Code Contributions** - Features, bug fixes, performance improvements
-2. **Documentation** - User guides, API docs, tutorials  
-3. **Testing** - Platform compatibility, edge case validation
-4. **Translations** - Multi-language interface support
-
-### License & Compliance
-- **Open Source**: MIT License for maximum flexibility
-- **Enterprise Friendly**: Commercial use permitted
-- **Compliance**: GDPR, SOX, and audit-friendly logging
-
----
-
-## 🔗 Links & Resources
-
-- **Repository**: [GitHub](https://github.com/Mezraniwassim/MoxNas)
-- **Issues**: [Bug Reports](https://github.com/Mezraniwassim/MoxNas/issues)  
-- **Discussions**: [Community Forum](https://github.com/Mezraniwassim/MoxNas/discussions)
-- **Releases**: [Download Latest](https://github.com/Mezraniwassim/MoxNas/releases)
-
----
-
-<div align="center">
-
-**MoxNAS** - Professional NAS solution for the modern enterprise
-
-*Built with ❤️ for the Proxmox community*
-
-</div>
+Made with ❤️ for the Proxmox community

@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}System Monitoring - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="h2 mb-4"><i class="bi bi-graph-up"></i> System Monitoring</h1>
+    </div>
+</div>
+
+<!-- System Overview -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">System Uptime</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ system_info.uptime }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-clock text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Active Pools</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pools|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-layers text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Storage Devices</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ devices|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-device-hdd text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Active Alerts</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ recent_alerts|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-exclamation-triangle text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Charts -->
+<div class="row mb-4">
+    <div class="col-xl-8 col-lg-7">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">System Performance</h6>
+                <div class="dropdown no-arrow">
+                    <a class="dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-three-dots-vertical text-gray-400"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end shadow">
+                        <a class="dropdown-item" href="{{ url_for('monitoring.performance') }}">View Details</a>
+                        <a class="dropdown-item" href="#" onclick="exportChart()">Export Data</a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="position: relative; height: 300px;">
+                    <canvas id="systemPerformanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-4 col-lg-5">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Resource Usage</h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="position: relative; height: 300px;">
+                    <canvas id="resourceUsageChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Storage Health and Alerts -->
+<div class="row mb-4">
+    <div class="col-xl-6">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">Storage Health</h6>
+                <a href="{{ url_for('storage.devices') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% for device in devices[:5] %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="status-indicator {{ device.status.value }}"></div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold">{{ device.device_name }}</div>
+                        <div class="text-muted small">{{ device.device_model or 'Unknown Model' }}</div>
+                    </div>
+                    <div class="text-end">
+                        {% if device.temperature %}
+                        <div class="badge bg-{{ 'danger' if device.temperature > 60 else 'warning' if device.temperature > 50 else 'success' }}">
+                            {{ device.temperature }}°C
+                        </div>
+                        {% endif %}
+                        <div class="text-muted small">{{ device.status.value.title() }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                {% if devices|length > 5 %}
+                <div class="text-center">
+                    <a href="{{ url_for('storage.devices') }}" class="btn btn-sm btn-outline-secondary">
+                        View All {{ devices|length }} Devices
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-6">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Alerts</h6>
+                <a href="{{ url_for('monitoring.alerts') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_alerts %}
+                <div class="list-group list-group-flush">
+                    {% for alert in recent_alerts[:5] %}
+                    <div class="list-group-item d-flex justify-content-between align-items-start px-0">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">{{ alert.title }}</div>
+                            <small class="text-muted">{{ alert.message[:80] }}{% if alert.message|length > 80 %}...{% endif %}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-{{ 'danger' if alert.severity.value == 'critical' else 'warning' if alert.severity.value == 'warning' else 'info' }} rounded-pill">
+                                {{ alert.severity.value }}
+                            </span>
+                            <div class="text-muted small">{{ alert.created_at.strftime('%m/%d %H:%M') }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if recent_alerts|length > 5 %}
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('monitoring.alerts') }}" class="btn btn-sm btn-outline-secondary">
+                        View All Alerts
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="text-center py-3">
+                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                    <h6 class="text-muted mt-2">No Active Alerts</h6>
+                    <p class="text-muted small">System is operating normally.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Information -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">System Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td class="fw-bold">Hostname:</td>
+                                <td>{{ system_info.hostname }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Platform:</td>
+                                <td>{{ system_info.platform }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Architecture:</td>
+                                <td>{{ system_info.architecture }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Boot Time:</td>
+                                <td>{{ system_info.boot_time.strftime('%Y-%m-%d %H:%M:%S') if system_info.boot_time else 'Unknown' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td class="fw-bold">CPU Cores:</td>
+                                <td>{{ system_info.cpu_count }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Total Memory:</td>
+                                <td>{{ "%.1f GB" | format((system_info.memory_total / (1024**3)) if system_info.memory_total else 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Total Storage:</td>
+                                <td>{{ "%.1f GB" | format((system_info.disk_total / (1024**3)) if system_info.disk_total else 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Uptime:</td>
+                                <td>{{ system_info.uptime }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let systemPerformanceChart;
+let resourceUsageChart;
+let performanceData = {
+    labels: [],
+    cpu: [],
+    memory: [],
+    disk: []
+};
+
+function initCharts() {
+    // System Performance Chart
+    const performanceCtx = document.getElementById('systemPerformanceChart').getContext('2d');
+    systemPerformanceChart = new Chart(performanceCtx, {
+        type: 'line',
+        data: {
+            labels: performanceData.labels,
+            datasets: [{
+                label: 'CPU %',
+                data: performanceData.cpu,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                tension: 0.1,
+                fill: true
+            }, {
+                label: 'Memory %',
+                data: performanceData.memory,
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+    
+    // Resource Usage Doughnut Chart
+    const resourceCtx = document.getElementById('resourceUsageChart').getContext('2d');
+    resourceUsageChart = new Chart(resourceCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Used', 'Available'],
+            datasets: [{
+                data: [0, 100],
+                backgroundColor: [
+                    'rgb(255, 99, 132)',
+                    'rgb(201, 203, 207)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed.toFixed(1) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateCharts() {
+    fetch('{{ url_for("monitoring.api_system_metrics") }}')
+        .then(response => response.json())
+        .then(data => {
+            const now = new Date().toLocaleTimeString();
+            
+            // Update performance chart
+            performanceData.labels.push(now);
+            performanceData.cpu.push(data.cpu.percent);
+            performanceData.memory.push(data.memory.percent);
+            
+            // Keep only last 20 data points
+            if (performanceData.labels.length > 20) {
+                performanceData.labels.shift();
+                performanceData.cpu.shift();
+                performanceData.memory.shift();
+            }
+            
+            systemPerformanceChart.update('none');
+            
+            // Update resource usage chart
+            resourceUsageChart.data.datasets[0].data = [
+                data.memory.percent,
+                100 - data.memory.percent
+            ];
+            resourceUsageChart.update();
+        })
+        .catch(error => {
+            console.error('Error updating charts:', error);
+        });
+}
+
+function exportChart() {
+    // Export chart data as CSV
+    let csv = 'Time,CPU %,Memory %\n';
+    for (let i = 0; i < performanceData.labels.length; i++) {
+        csv += `${performanceData.labels[i]},${performanceData.cpu[i]},${performanceData.memory[i]}\n`;
+    }
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'system-performance.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Initialize charts and start updates
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    
+    // Initial update
+    updateCharts();
+    
+    // Update every 5 seconds
+    setInterval(updateCharts, 5000);
+});
+</script>
+{% endblock %}

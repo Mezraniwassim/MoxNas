@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2021-2024 community-scripts ORG
+# Author: MoxNAS Team  
+# License: MIT
+# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+
+# App Default Values
+APP="MoxNAS"
+var_tags="storage;nas;file-sharing"
+var_cpu="4"
+var_ram="4096"
+var_disk="20"
+var_os="ubuntu"
+var_version="24.04"
+var_unprivileged="1"
+
+# App Output & Base Settings
+header_info "$APP"
+base_settings
+
+# Core
+variables
+color
+catch_errors
+
+function update_script() {
+    header_info
+    check_container_storage
+    check_container_resources
+    
+    if [[ ! -d /opt/moxnas ]]; then
+        msg_error "No ${APP} Installation Found!"
+        exit
+    fi
+    
+    msg_info "Stopping ${APP} Services"
+    supervisorctl stop moxnas-web moxnas-worker moxnas-beat
+    systemctl stop moxnas-health
+    msg_ok "Stopped ${APP} Services"
+
+    msg_info "Backing up Current Installation"
+    cp -r /opt/moxnas /opt/moxnas.backup.$(date +%Y%m%d_%H%M%S)
+    msg_ok "Backup Created"
+
+    msg_info "Updating ${APP}"
+    cd /opt/moxnas
+    
+    # Download latest version
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/moxnas/moxnas/releases/latest | grep tag_name | cut -d '"' -f 4)
+    if [ -z "$LATEST_VERSION" ]; then
+        # Fallback to main branch
+        wget -O moxnas-update.tar.gz https://github.com/moxnas/moxnas/archive/refs/heads/main.tar.gz
+    else
+        wget -O moxnas-update.tar.gz https://github.com/moxnas/moxnas/archive/refs/tags/$LATEST_VERSION.tar.gz
+    fi
+    
+    # Extract to temporary directory
+    mkdir -p /tmp/moxnas-update
+    tar -xzf moxnas-update.tar.gz -C /tmp/moxnas-update --strip-components=1
+    
+    # Copy application files (preserve config)
+    cp -r /tmp/moxnas-update/app /opt/moxnas/
+    cp -r /tmp/moxnas-update/migrations /opt/moxnas/
+    cp /tmp/moxnas-update/requirements.txt /opt/moxnas/
+    cp /tmp/moxnas-update/wsgi.py /opt/moxnas/
+    cp /tmp/moxnas-update/celery_worker.py /opt/moxnas/
+    cp /tmp/moxnas-update/migrate.py /opt/moxnas/
+    cp /tmp/moxnas-update/health_monitor.py /opt/moxnas/
+    
+    # Update dependencies
+    sudo -u moxnas bash -c "source venv/bin/activate && pip install --upgrade pip"
+    sudo -u moxnas bash -c "source venv/bin/activate && pip install -r requirements.txt"
+    
+    # Run database migrations
+    sudo -u moxnas bash -c "source venv/bin/activate && python migrate.py upgrade"
+    
+    # Update health monitor
+    cp /opt/moxnas/health_monitor.py /usr/local/bin/moxnas-health-monitor
+    chmod +x /usr/local/bin/moxnas-health-monitor
+    
+    # Cleanup
+    rm moxnas-update.tar.gz
+    rm -rf /tmp/moxnas-update
+    
+    # Fix permissions
+    chown -R moxnas:moxnas /opt/moxnas
+    
+    msg_ok "Updated ${APP}"
+
+    msg_info "Starting ${APP} Services"
+    supervisorctl start moxnas-web moxnas-worker moxnas-beat
+    systemctl start moxnas-health
+    msg_ok "Started ${APP} Services"
+
+    msg_info "Cleaning up"
+    apt-get autoremove -y
+    apt-get autoclean
+    msg_ok "Cleaned"
+    
+    msg_ok "Updated Successfully"
+    exit
+}
+
+start
+build_container
+description
+
+msg_ok "Completed Successfully!\n"
+echo -e "${APP} should be reachable by going to the following URL.
+         ${BL}https://${IP}${CL} \n"

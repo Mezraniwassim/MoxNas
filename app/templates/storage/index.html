@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Storage Management - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2 mb-0"><i class="bi bi-hdd"></i> Storage Management</h1>
+            {% if current_user.is_admin() %}
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary" onclick="scanDevices()">
+                    <i class="bi bi-arrow-clockwise"></i> Scan Devices
+                </button>
+                <a href="{{ url_for('storage.create_pool') }}" class="btn btn-success">
+                    <i class="bi bi-plus-lg"></i> Create Pool
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Storage Overview Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Capacity</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ "%.1f TB" | format((total_capacity / (1024**4)) if total_capacity else 0) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-hdd-stack text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Used Space</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ "%.1f TB" | format((used_capacity / (1024**4)) if used_capacity else 0) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-pie-chart text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Storage Pools</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pools|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-layers text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Device Health</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            <span class="text-success">{{ device_counts.healthy }}</span>
+                            <span class="text-warning">{{ device_counts.warning }}</span>
+                            <span class="text-danger">{{ device_counts.failed }}</span>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-shield-check text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Storage Pools -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Storage Pools</h6>
+            </div>
+            <div class="card-body">
+                {% if pools %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>RAID Level</th>
+                                <th>Filesystem</th>
+                                <th>Size</th>
+                                <th>Usage</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pool in pools %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('storage.pool_detail', pool_id=pool.id) }}" class="fw-bold">
+                                        {{ pool.name }}
+                                    </a>
+                                </td>
+                                <td><span class="badge bg-secondary">{{ pool.raid_level.upper() }}</span></td>
+                                <td>{{ pool.filesystem_type }}</td>
+                                <td>{{ "%.1f GB" | format((pool.total_size / (1024**3)) if pool.total_size else 0) }}</td>
+                                <td>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ (pool.used_size / pool.total_size * 100) if pool.total_size else 0 }}%">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ "%.1f%%" | format((pool.used_size / pool.total_size * 100) if pool.total_size else 0) }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if pool.status.value == 'healthy' else 'warning' if pool.status.value == 'degraded' else 'danger' }}">
+                                        {{ pool.status.value.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('storage.pool_detail', pool_id=pool.id) }}" class="btn btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if current_user.is_admin() %}
+                                        <button class="btn btn-outline-warning" onclick="startPoolScrub({{ pool.id }})">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" onclick="deletePool({{ pool.id }}, '{{ pool.name }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-hdd text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-2">No Storage Pools</h5>
+                    <p class="text-muted">Create your first storage pool to get started.</p>
+                    {% if current_user.is_admin() %}
+                    <a href="{{ url_for('storage.create_pool') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Create Storage Pool
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Storage Devices -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">Storage Devices</h6>
+                <a href="{{ url_for('storage.devices') }}" class="btn btn-sm btn-outline-primary">
+                    View All Devices <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                {% if devices %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Device</th>
+                                <th>Model</th>
+                                <th>Size</th>
+                                <th>Temperature</th>
+                                <th>Status</th>
+                                <th>Pool</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in devices[:10] %}
+                            <tr>
+                                <td>
+                                    <div class="device-status {{ device.status.value }}">
+                                        <i class="bi bi-{{ 'check-circle' if device.status.value == 'healthy' else 'exclamation-triangle' if device.status.value == 'warning' else 'x-circle' }}"></i>
+                                        {{ device.device_name }}
+                                    </div>
+                                </td>
+                                <td>{{ device.device_model or 'Unknown' }}</td>
+                                <td>{{ "%.1f GB" | format((device.device_size / (1024**3)) if device.device_size else 0) }}</td>
+                                <td>
+                                    {% if device.temperature %}
+                                        <span class="badge bg-{{ 'danger' if device.temperature > 60 else 'warning' if device.temperature > 50 else 'success' }}">
+                                            {{ device.temperature }}°C
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if device.status.value == 'healthy' else 'warning' if device.status.value == 'warning' else 'danger' }}">
+                                        {{ device.status.value.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if device.pool %}
+                                        <a href="{{ url_for('storage.pool_detail', pool_id=device.pool.id) }}">
+                                            {{ device.pool.name }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if devices|length > 10 %}
+                <div class="text-center">
+                    <a href="{{ url_for('storage.devices') }}" class="btn btn-outline-primary">
+                        View All {{ devices|length }} Devices
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-device-hdd text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-2">No Storage Devices</h5>
+                    <p class="text-muted">Scan for storage devices to get started.</p>
+                    {% if current_user.is_admin() %}
+                    <button class="btn btn-primary" onclick="scanDevices()">
+                        <i class="bi bi-arrow-clockwise"></i> Scan for Devices
+                    </button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh storage status every 30 seconds
+setInterval(function() {
+    fetch('{{ url_for("storage.api_storage_overview") }}')
+        .then(response => response.json())
+        .then(data => {
+            // Update storage overview cards if needed
+            // This would update the display with fresh data
+        })
+        .catch(error => console.error('Error updating storage overview:', error));
+}, 30000);
+</script>
+{% endblock %}

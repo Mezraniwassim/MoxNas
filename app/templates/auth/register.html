@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}Register - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-5 col-lg-6 col-md-7">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-success text-white text-center py-4">
+                <h4 class="mb-0">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Create Account
+                </h4>
+                <p class="mb-0 small">Join MoxNAS Professional Storage</p>
+            </div>
+            <div class="card-body p-4">
+                {% if not registration_enabled %}
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Registration Disabled</strong><br>
+                    New user registration is currently disabled. Contact your administrator.
+                </div>
+                {% else %}
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.username.label(class="form-label fw-bold") }}
+                                {{ form.username(class="form-control", placeholder="Choose username") }}
+                                <div class="form-text">3-20 characters, letters and numbers only</div>
+                                {% if form.username.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.username.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.email.label(class="form-label fw-bold") }}
+                                {{ form.email(class="form-control", placeholder="your@email.com") }}
+                                {% if form.email.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.email.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.first_name.label(class="form-label fw-bold") }}
+                                {{ form.first_name(class="form-control", placeholder="First name") }}
+                                {% if form.first_name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.first_name.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.last_name.label(class="form-label fw-bold") }}
+                                {{ form.last_name(class="form-control", placeholder="Last name") }}
+                                {% if form.last_name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.last_name.errors %}
+                                            <div>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label fw-bold") }}
+                        <div class="input-group">
+                            {{ form.password(class="form-control", placeholder="Create password") }}
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('password')">
+                                <i class="bi bi-eye" id="passwordToggle"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <div class="password-requirements">
+                                <small class="requirement" id="req-length">
+                                    <i class="bi bi-x-circle text-danger"></i> At least 8 characters
+                                </small><br>
+                                <small class="requirement" id="req-upper">
+                                    <i class="bi bi-x-circle text-danger"></i> One uppercase letter
+                                </small><br>
+                                <small class="requirement" id="req-lower">
+                                    <i class="bi bi-x-circle text-danger"></i> One lowercase letter
+                                </small><br>
+                                <small class="requirement" id="req-number">
+                                    <i class="bi bi-x-circle text-danger"></i> One number
+                                </small>
+                            </div>
+                        </div>
+                        {% if form.password.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.password.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.confirm_password.label(class="form-label fw-bold") }}
+                        <div class="input-group">
+                            {{ form.confirm_password(class="form-control", placeholder="Confirm password") }}
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirm_password')">
+                                <i class="bi bi-eye" id="confirmPasswordToggle"></i>
+                            </button>
+                        </div>
+                        <div class="password-match-indicator" id="passwordMatch"></div>
+                        {% if form.confirm_password.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.confirm_password.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.accept_terms(class="form-check-input") }}
+                            <label for="accept_terms" class="form-check-label">
+                                I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>
+                            </label>
+                        </div>
+                        {% if form.accept_terms.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.accept_terms.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-success btn-lg") }}
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-light text-center py-3">
+                <small class="text-muted">
+                    Already have an account? 
+                    <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Sign in here</a>
+                </small>
+            </div>
+        </div>
+        
+        <!-- Security Information -->
+        <div class="card mt-3 border-0">
+            <div class="card-body text-center">
+                <h6 class="card-title">
+                    <i class="bi bi-shield-check text-success"></i>
+                    Account Security
+                </h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <i class="bi bi-key text-muted"></i>
+                        <div class="small text-muted">Strong Passwords</div>
+                    </div>
+                    <div class="col-md-4">
+                        <i class="bi bi-shield-check text-muted"></i>
+                        <div class="small text-muted">2FA Available</div>
+                    </div>
+                    <div class="col-md-4">
+                        <i class="bi bi-lock text-muted"></i>
+                        <div class="small text-muted">Encrypted Data</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePassword(fieldId) {
+    const passwordInput = document.getElementById(fieldId);
+    const toggleIcon = document.getElementById(fieldId + 'Toggle');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.className = 'bi bi-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.className = 'bi bi-eye';
+    }
+}
+
+// Real-time password validation
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    
+    // Username validation
+    const usernameInput = document.getElementById('username');
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function() {
+            // Remove invalid characters
+            this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
+            
+            // Limit length
+            if (this.value.length > 20) {
+                this.value = this.value.substring(0, 20);
+            }
+        });
+    }
+    
+    if (passwordInput) {
+        passwordInput.addEventListener('input', function() {
+            validatePassword(this.value);
+            checkPasswordMatch();
+        });
+    }
+    
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', function() {
+            checkPasswordMatch();
+        });
+    }
+    
+    // Auto-focus on first empty field
+    const firstEmptyField = document.querySelector('input:not([type="hidden"]):not([type="checkbox"])');
+    if (firstEmptyField && !firstEmptyField.value) {
+        firstEmptyField.focus();
+    }
+});
+
+function validatePassword(password) {
+    const requirements = {
+        'req-length': password.length >= 8,
+        'req-upper': /[A-Z]/.test(password),
+        'req-lower': /[a-z]/.test(password),
+        'req-number': /\d/.test(password)
+    };
+    
+    Object.keys(requirements).forEach(reqId => {
+        const element = document.getElementById(reqId);
+        const icon = element.querySelector('i');
+        
+        if (requirements[reqId]) {
+            icon.className = 'bi bi-check-circle text-success';
+            element.classList.add('text-success');
+            element.classList.remove('text-danger');
+        } else {
+            icon.className = 'bi bi-x-circle text-danger';
+            element.classList.add('text-danger');
+            element.classList.remove('text-success');
+        }
+    });
+    
+    // Update overall password strength
+    const strength = Object.values(requirements).filter(Boolean).length;
+    const passwordField = document.getElementById('password');
+    
+    passwordField.classList.remove('is-valid', 'is-invalid');
+    
+    if (password.length > 0) {
+        if (strength === 4) {
+            passwordField.classList.add('is-valid');
+        } else if (strength < 2) {
+            passwordField.classList.add('is-invalid');
+        }
+    }
+}
+
+function checkPasswordMatch() {
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    const matchIndicator = document.getElementById('passwordMatch');
+    const confirmField = document.getElementById('confirm_password');
+    
+    if (confirmPassword.length === 0) {
+        matchIndicator.innerHTML = '';
+        confirmField.classList.remove('is-valid', 'is-invalid');
+        return;
+    }
+    
+    if (password === confirmPassword) {
+        matchIndicator.innerHTML = '<small class="text-success"><i class="bi bi-check-circle"></i> Passwords match</small>';
+        confirmField.classList.add('is-valid');
+        confirmField.classList.remove('is-invalid');
+    } else {
+        matchIndicator.innerHTML = '<small class="text-danger"><i class="bi bi-x-circle"></i> Passwords do not match</small>';
+        confirmField.classList.add('is-invalid');
+        confirmField.classList.remove('is-valid');
+    }
+}
+
+// Email validation
+document.getElementById('email').addEventListener('blur', function() {
+    const email = this.value;
+    if (email && email.includes('@')) {
+        // Simple email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(email)) {
+            this.classList.add('is-valid');
+            this.classList.remove('is-invalid');
+        } else {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+        }
+    } else if (email.length > 0) {
+        this.classList.add('is-invalid');
+        this.classList.remove('is-valid');
+    } else {
+        this.classList.remove('is-valid', 'is-invalid');
+    }
+});
+
+// Form submission validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    const acceptTerms = document.getElementById('accept_terms').checked;
+    
+    // Check password requirements
+    const requirements = [
+        password.length >= 8,
+        /[A-Z]/.test(password),
+        /[a-z]/.test(password),
+        /\d/.test(password)
+    ];
+    
+    if (!requirements.every(Boolean)) {
+        e.preventDefault();
+        alert('Please ensure your password meets all requirements.');
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        e.preventDefault();
+        alert('Passwords do not match.');
+        return;
+    }
+    
+    if (!acceptTerms) {
+        e.preventDefault();
+        alert('Please accept the Terms of Service and Privacy Policy.');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = this.querySelector('input[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.value = 'Creating Account...';
+});
+</script>
+
+<style>
+.password-requirements .requirement {
+    display: block;
+    margin-bottom: 2px;
+}
+
+.password-requirements .requirement i {
+    width: 16px;
+}
+
+.card-header {
+    border-radius: 0.375rem 0.375rem 0 0 !important;
+}
+
+.is-valid {
+    border-color: #198754;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+}
+
+.password-match-indicator {
+    margin-top: 0.25rem;
+}
+</style>
+{% endblock %}

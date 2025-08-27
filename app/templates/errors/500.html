@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6 col-md-8">
+        <div class="text-center">
+            <div class="error-code">
+                <h1 class="display-1 fw-bold text-danger">500</h1>
+            </div>
+            
+            <div class="error-icon mb-4">
+                <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+            </div>
+            
+            <h2 class="h4 mb-3">Internal Server Error</h2>
+            <p class="text-muted mb-4">
+                Something went wrong on our end. We're working to fix this issue.
+                If the problem persists, please contact your system administrator.
+            </p>
+            
+            <div class="mb-4">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary me-2">
+                    <i class="bi bi-house me-1"></i>
+                    Return to Dashboard
+                </a>
+                <button class="btn btn-outline-secondary me-2" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>
+                    Retry
+                </button>
+                <button class="btn btn-outline-secondary" onclick="history.back()">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    Go Back
+                </button>
+            </div>
+            
+            <!-- System Status -->
+            <div class="card bg-light border-0 mb-4">
+                <div class="card-body">
+                    <h6 class="card-title">System Status</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="status-item" id="systemStatus">
+                                <i class="bi bi-server text-muted"></i>
+                                <div class="small">System</div>
+                                <div class="status-badge">
+                                    <span class="badge bg-secondary">Checking...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="status-item" id="databaseStatus">
+                                <i class="bi bi-database text-muted"></i>
+                                <div class="small">Database</div>
+                                <div class="status-badge">
+                                    <span class="badge bg-secondary">Checking...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="status-item" id="storageStatus">
+                                <i class="bi bi-hdd text-muted"></i>
+                                <div class="small">Storage</div>
+                                <div class="status-badge">
+                                    <span class="badge bg-secondary">Checking...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Error Report -->
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0">
+                        <i class="bi bi-bug me-2"></i>
+                        Report This Error
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        Help us improve MoxNAS by reporting this error. The following information will be sent:
+                    </p>
+                    <form id="errorReportForm" onsubmit="submitErrorReport(event)">
+                        <div class="mb-3">
+                            <label for="errorDescription" class="form-label">What were you trying to do?</label>
+                            <textarea class="form-control" id="errorDescription" rows="3" 
+                                      placeholder="Describe what you were doing when this error occurred..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="userEmail" class="form-label">Email (optional)</label>
+                            <input type="email" class="form-control" id="userEmail" 
+                                   placeholder="your.email@example.com">
+                            <div class="form-text">We'll only use this to follow up on the error report</div>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i class="bi bi-send me-1"></i>
+                            Send Error Report
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technical Details (Admin Users Only) -->
+{% if current_user and current_user.is_authenticated and current_user.is_admin() %}
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-8">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0">
+                    <i class="bi bi-shield-exclamation me-2"></i>
+                    Technical Details (Admin Only)
+                </h6>
+            </div>
+            <div class="card-body">
+                <dl class="row small">
+                    <dt class="col-sm-3">Error ID:</dt>
+                    <dd class="col-sm-9"><code>{{ error_id or 'N/A' }}</code></dd>
+                    
+                    <dt class="col-sm-3">Timestamp:</dt>
+                    <dd class="col-sm-9"><code>{{ moment().format('YYYY-MM-DD HH:mm:ss UTC') }}</code></dd>
+                    
+                    <dt class="col-sm-3">Requested URL:</dt>
+                    <dd class="col-sm-9"><code>{{ request.url }}</code></dd>
+                    
+                    <dt class="col-sm-3">Method:</dt>
+                    <dd class="col-sm-9"><code>{{ request.method }}</code></dd>
+                    
+                    <dt class="col-sm-3">User:</dt>
+                    <dd class="col-sm-9"><code>{{ current_user.username if current_user.is_authenticated else 'Anonymous' }}</code></dd>
+                    
+                    <dt class="col-sm-3">Remote IP:</dt>
+                    <dd class="col-sm-9"><code>{{ request.remote_addr }}</code></dd>
+                </dl>
+                
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-danger" onclick="viewErrorLogs()">
+                        <i class="bi bi-file-text me-1"></i>
+                        View Error Logs
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="downloadSystemInfo()">
+                        <i class="bi bi-download me-1"></i>
+                        Download System Info
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Check system status
+function checkSystemStatus() {
+    const statusItems = ['systemStatus', 'databaseStatus', 'storageStatus'];
+    
+    statusItems.forEach(itemId => {
+        // Simulate status check (replace with actual API calls)
+        setTimeout(() => {
+            const item = document.getElementById(itemId);
+            const badge = item.querySelector('.status-badge span');
+            
+            // Random status for demo (replace with real status)
+            const statuses = ['success', 'warning', 'danger'];
+            const labels = ['Online', 'Warning', 'Error'];
+            const randomIndex = Math.floor(Math.random() * 3);
+            
+            badge.className = `badge bg-${statuses[randomIndex]}`;
+            badge.textContent = labels[randomIndex];
+        }, Math.random() * 2000 + 500);
+    });
+}
+
+// Submit error report
+function submitErrorReport(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const description = form.querySelector('#errorDescription').value;
+    const email = form.querySelector('#userEmail').value;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending...';
+    
+    // Simulate sending report (replace with actual API call)
+    setTimeout(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check me-1"></i>Report Sent';
+        submitBtn.classList.remove('btn-warning');
+        submitBtn.classList.add('btn-success');
+        
+        // Show success message
+        showAlert('Error report sent successfully. Thank you for helping us improve MoxNAS!', 'success');
+        
+        // Reset form
+        setTimeout(() => {
+            form.reset();
+            submitBtn.innerHTML = '<i class="bi bi-send me-1"></i>Send Error Report';
+            submitBtn.classList.remove('btn-success');
+            submitBtn.classList.add('btn-warning');
+        }, 3000);
+    }, 2000);
+}
+
+// Admin functions
+function viewErrorLogs() {
+    window.open('/admin/logs/errors', '_blank');
+}
+
+function downloadSystemInfo() {
+    const link = document.createElement('a');
+    link.href = '/api/system/info/export';
+    link.download = `moxnas-system-info-${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+}
+
+// Auto-retry functionality
+let retryCount = 0;
+const maxRetries = 3;
+
+function autoRetry() {
+    if (retryCount < maxRetries) {
+        retryCount++;
+        console.log(`Auto-retry attempt ${retryCount}/${maxRetries}`);
+        
+        // Show retry notification
+        showAlert(`Attempting to recover... (${retryCount}/${maxRetries})`, 'info');
+        
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // F5 or Ctrl+R to retry
+    if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+        e.preventDefault();
+        location.reload();
+    }
+    
+    // Escape to go back
+    if (e.key === 'Escape') {
+        history.back();
+    }
+    
+    // Alt + H for home
+    if (e.altKey && e.key === 'h') {
+        e.preventDefault();
+        window.location.href = '{{ url_for("main.dashboard") }}';
+    }
+    
+    // Alt + R to report error
+    if (e.altKey && e.key === 'r') {
+        e.preventDefault();
+        document.getElementById('errorDescription').focus();
+    }
+});
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    checkSystemStatus();
+    
+    // Auto-focus on error description if visible
+    const errorDescription = document.getElementById('errorDescription');
+    if (errorDescription) {
+        errorDescription.focus();
+    }
+    
+    // Check if this is a critical error that requires auto-retry
+    const criticalKeywords = ['database', 'connection', 'timeout', 'network'];
+    const currentURL = window.location.href.toLowerCase();
+    
+    if (criticalKeywords.some(keyword => currentURL.includes(keyword))) {
+        setTimeout(autoRetry, 5000);
+    }
+});
+</script>
+
+<style>
+.error-code h1 {
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.error-icon i {
+    opacity: 0.8;
+    animation: shake 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes shake {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(2px);
+    }
+}
+
+.status-item {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.status-item i {
+    font-size: 1.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.status-badge {
+    margin-top: 0.5rem;
+}
+
+.card-body .row .col-md-4 {
+    margin-bottom: 1rem;
+}
+
+/* Loading animation for status badges */
+.badge.bg-secondary {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Error report form styling */
+#errorReportForm textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+#errorReportForm .form-text {
+    font-size: 0.8rem;
+}
+</style>
+{% endblock %}

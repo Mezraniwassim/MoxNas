@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}Backup Management - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2 mb-0"><i class="bi bi-archive"></i> Backup Management</h1>
+            {% if current_user.is_admin() %}
+            <div class="btn-group">
+                <a href="{{ url_for('backups.create') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg"></i> Create Backup Job
+                </a>
+                <button class="btn btn-success" onclick="runQuickBackup()">
+                    <i class="bi bi-play"></i> Quick Backup
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Backup Overview Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Jobs</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ backup_jobs|length }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-archive text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Successful Backups</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ backup_stats.successful }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-check-circle text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Failed Backups</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ backup_stats.failed }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-x-circle text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Storage Used</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ "%.1f GB" | format((backup_stats.total_size / (1024**3)) if backup_stats.total_size else 0) }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-hdd text-gray-300" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Backup Jobs -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Backup Jobs</h6>
+            </div>
+            <div class="card-body">
+                {% if backup_jobs %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Schedule</th>
+                                <th>Last Run</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for job in backup_jobs %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('backups.detail', job_id=job.id) }}" class="fw-bold">
+                                        {{ job.name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ job.source_type.value }}</small><br>
+                                    {{ job.source_path }}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ job.destination_type.value }}</small><br>
+                                    {{ job.destination_path }}
+                                </td>
+                                <td>
+                                    {% if job.schedule %}
+                                        <span class="badge bg-info">{{ job.schedule }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Manual</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if job.last_run %}
+                                        {{ job.last_run.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        <span class="text-muted">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if job.status.value == 'completed' else 'warning' if job.status.value == 'running' else 'danger' if job.status.value == 'failed' else 'secondary' }}">
+                                        {{ job.status.value.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('backups.detail', job_id=job.id) }}" class="btn btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if current_user.is_admin() %}
+                                        <button class="btn btn-outline-success" onclick="runBackupJob({{ job.id }})">
+                                            <i class="bi bi-play"></i>
+                                        </button>
+                                        <a href="{{ url_for('backups.edit', job_id=job.id) }}" class="btn btn-outline-warning">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button class="btn btn-outline-danger" onclick="deleteBackupJob({{ job.id }}, '{{ job.name }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-archive text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-2">No Backup Jobs</h5>
+                    <p class="text-muted">Create your first backup job to protect your data.</p>
+                    {% if current_user.is_admin() %}
+                    <a href="{{ url_for('backups.create') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Create Backup Job
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Backup History -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Backup History</h6>
+                <a href="{{ url_for('backups.history') }}" class="btn btn-sm btn-outline-primary">
+                    View All History <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_backups %}
+                <div class="timeline">
+                    {% for backup in recent_backups %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-{{ 'success' if backup.status.value == 'completed' else 'danger' if backup.status.value == 'failed' else 'warning' }}"></div>
+                        <div class="timeline-content">
+                            <h6 class="timeline-title">{{ backup.job.name }}</h6>
+                            <p class="timeline-text">
+                                {{ backup.status.value.title() }} backup
+                                {% if backup.bytes_transferred %}
+                                - {{ "%.1f MB" | format(backup.bytes_transferred / (1024**2)) }} transferred
+                                {% endif %}
+                                {% if backup.duration %}
+                                - {{ "%.1f" | format(backup.duration) }}s
+                                {% endif %}
+                            </p>
+                            <small class="text-muted">{{ backup.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3">
+                    <i class="bi bi-clock-history text-muted" style="font-size: 2rem;"></i>
+                    <h6 class="text-muted mt-2">No Backup History</h6>
+                    <p class="text-muted">Backup history will appear here once jobs are run.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function runBackupJob(jobId) {
+    if (confirm('Are you sure you want to run this backup job now?')) {
+        fetch(`{{ url_for('backups.api_run_job', job_id='') }}${jobId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Backup job started successfully', 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showAlert(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Failed to start backup job', 'danger');
+        });
+    }
+}
+
+function runQuickBackup() {
+    const modal = new bootstrap.Modal(document.getElementById('quickBackupModal'));
+    modal.show();
+}
+
+function deleteBackupJob(jobId, jobName) {
+    if (confirm(`Are you sure you want to delete backup job "${jobName}"? This cannot be undone.`)) {
+        fetch(`{{ url_for('backups.api_delete_job', job_id='') }}${jobId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Backup job deleted successfully', 'success');
+                location.reload();
+            } else {
+                showAlert(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Failed to delete backup job', 'danger');
+        });
+    }
+}
+
+// Auto-refresh backup status every 30 seconds
+setInterval(function() {
+    fetch('{{ url_for("backups.api_status") }}')
+        .then(response => response.json())
+        .then(data => {
+            // Update running job indicators
+            document.querySelectorAll('.backup-status').forEach(element => {
+                const jobId = element.dataset.jobId;
+                if (data.running_jobs.includes(parseInt(jobId))) {
+                    element.className = 'badge bg-warning';
+                    element.textContent = 'Running';
+                }
+            });
+        })
+        .catch(error => console.error('Error updating backup status:', error));
+}, 30000);
+</script>
+
+<!-- Quick Backup Modal -->
+<div class="modal fade" id="quickBackupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Backup</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickBackupForm">
+                    <div class="mb-3">
+                        <label for="quickSource" class="form-label">Source Path</label>
+                        <input type="text" class="form-control" id="quickSource" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickDestination" class="form-label">Destination Path</label>
+                        <input type="text" class="form-control" id="quickDestination" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="quickCompress">
+                            <label class="form-check-label" for="quickCompress">
+                                Enable compression
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeQuickBackup()">Start Backup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #dee2e6;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.timeline-title {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.timeline-text {
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+</style>
+{% endblock %}
