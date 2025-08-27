@@ -51,7 +51,7 @@ fi
 msg_info "Deploying test MoxNAS container"
 CTID=$TEST_CTID CT_HOSTNAME=$TEST_HOSTNAME PASSWORD=$TEST_PASSWORD \
 CORES=2 MEMORY=2048 DISK_SIZE=10 \
-bash install-moxnas-lxc.sh
+bash moxnas-lxc-community.sh
 
 if [ $? -eq 0 ]; then
     msg_ok "Container deployment completed"

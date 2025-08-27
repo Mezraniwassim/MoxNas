@@ -40,7 +40,9 @@ MoxNAS/
 ├── requirements.txt              # Dependencies
 ├── wsgi.py                       # WSGI entry point
 ├── celery_worker.py              # Celery worker
-└── install.sh                    # Installation script
+├── install-moxnas-lxc.sh          # LXC installation script
+├── moxnas-lxc-community.sh        # Community-standard script
+└── install-moxnas.sh              # Standalone installation
 ```
 
 ## 🛠️ Technology Stack
@@ -73,39 +75,45 @@ MoxNAS/
 
 ## 🚀 Quick Installation
 
-### 1. One-Line Proxmox LXC Deployment (Recommended)
-
-Deploy a complete MoxNAS instance with a single command on your Proxmox VE host:
-
+### **Option 1: Community-Standard Script** ⭐ **(Recommended)**
 ```bash
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas-lxc.sh)"
+# Run on Proxmox host
+bash /home/wassim/Documents/MoxNAS/moxnas-lxc-community.sh
+```
+- ✅ Follows Proxmox community standards
+- ✅ Standard menu interface with customization options
+- ✅ Built-in update functionality
+- ✅ Proper error handling and verification
+
+### **Option 2: Direct LXC Installation**
+```bash
+# Alternative installation method
+bash /home/wassim/Documents/MoxNAS/install-moxnas-lxc.sh
+```
+- ✅ Direct container creation
+- ✅ Streamlined installation process
+
+### **Remote Installation** (When repository is public)
+```bash
+# Download and run in one command
+bash <(curl -s https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/moxnas-lxc-community.sh)
 ```
 
-**What this does:**
+**What these scripts do:**
 - ✅ Creates optimized Debian 12 LXC container
 - ✅ Installs all dependencies and services
 - ✅ Configures PostgreSQL database with secure credentials
 - ✅ Sets up Nginx with SSL/TLS certificates
 - ✅ Configures SMB, NFS, and FTP network shares
 - ✅ Deploys MoxNAS web interface with admin account
-- ✅ Enables firewall and security hardening
-- ✅ Provides ready-to-use NAS solution
+- ✅ Uses fixed password: `moxnas1234`
 
 **Post-Installation Access:**
 - 🌐 Web Interface: `https://container-ip`
 - 👤 Username: `admin`
-- 🔑 Password: Auto-generated (displayed after installation)
+- 🔑 Password: `moxnas1234`
 
-### 2. Container-Only Installation
-
-If you already have an LXC container, use the community script:
-
-```bash
-# From your Proxmox LXC container
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/moxnas.sh)"
-```
-
-### 3. Manual Installation
+### **Manual Installation**
 
 ```bash
 # Update system
@@ -125,13 +133,6 @@ pip install -r requirements.txt
 # Initialize database and create admin user
 python migrate.py init
 python migrate.py create-admin --username admin --email admin@moxnas.local
-```
-
-### 4. Docker Deployment (Coming Soon)
-
-```bash
-# Docker Compose deployment
-docker-compose up -d
 ```
 
 ## 💻 Usage

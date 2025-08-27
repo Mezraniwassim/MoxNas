@@ -1,18 +1,83 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2021-2024 tteck
+# Author: tteck (tteckster)
+# Co-Author: MoxNAS Team  
+# License: MIT
+# https://github.com/tteck/Proxmox/raw/main/LICENSE
+# 
 # MoxNAS LXC Container Creation and Installation Script
-# One-line deployment for Proxmox VE
-# Usage: bash -c "$(wget -qLO - https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/install-moxnas-lxc.sh)"
+# Based on Proxmox Community Scripts structure
+# Source: https://community-scripts.github.io/ProxmoxVE/
 
-set -euo pipefail
+source <(curl -s https://raw.githubusercontent.com/tteck/Proxmox/main/misc/build.func)
+# This will create a new Proxmox VE MoxNAS LXC Container
 
-# Colors for output
-RD="\033[01;31m"
-YW="\033[33m"
-GN="\033[1;92m"
-CL="\033[m"
-BFR="\\r\\033[K"
-HOLD="-"
+function header_info {
+cat <<"EOF"
+    __  ___           _   ____   ___    _____
+   /  |/  /____  ____| | / /  | /   |  / ___/
+  / /|_/ // __ \| __ | |/ /|  |/ /| |  \__ \
+ / /  / // /_/ /| /_/ >  < |___|_| |_| ___/ /
+/_/  /_/ \____/ \____/_/\_\____/|_| |_|/____/
+
+EOF
+}
+
+header_info
+echo -e "\n Loading..."
+
+# Application Default Values
+APP="MoxNAS"
+var_tags="storage;nas;smb;nfs"
+var_cpu="4"
+var_ram="4096"
+var_disk="20"
+var_os="debian"
+var_version="12"
+var_unprivileged="1"
+
+# Show menu
+variables
+color
+catch_errors
+
+function default_settings() {
+  CT_TYPE="1"
+  PW="moxnas1234"
+  CT_ID=$NEXTID
+  HN=$NSAPP
+  DISK_SIZE="$var_disk"
+  CORE_COUNT="$var_cpu"
+  RAM_SIZE="$var_ram"
+  BRG="vmbr0"
+  NET="dhcp"
+  GATE=""
+  APT_CACHER=""
+  APT_CACHER_IP=""
+  DISABLEIP6="no"
+  MTU=""
+  SD=""
+  NS=""
+  MAC=""
+  VLAN=""
+  SSH="no"
+  VERB="no"
+  echo_default
+}
+
+function update_script() {
+header_info
+if [[ ! -f /opt/moxnas/moxnas-service.py ]]; then
+  msg_error "No ${APP} Installation Found!"
+  exit
+fi
+msg_info "Updating ${APP} LXC"
+apt-get update &>/dev/null
+apt-get -y upgrade &>/dev/null
+msg_ok "Updated ${APP} LXC"
+exit
+}
 
 # Display functions
 function msg_info() {
@@ -112,6 +177,7 @@ NETWORK=${NETWORK:-"vmbr0"}
 IP_CONFIG=${IP_CONFIG:-"dhcp"}
 GITHUB_REPO=${GITHUB_REPO:-"https://github.com/Mezraniwassim/MoxNAS.git"}
 BRANCH=${BRANCH:-"master"}
+LOCAL_SOURCE=${LOCAL_SOURCE:-"/home/wassim/Documents/MoxNAS"}
 
 # Storage configuration
 STORAGE_DISKS=${STORAGE_DISKS:-""}  # Comma-separated list of disks to pass through (e.g., "/dev/sdb,/dev/sdc")
@@ -270,10 +336,21 @@ mkdir -p /opt/moxnas
 msg_info "Installing MoxNAS application"
 cd /opt/moxnas
 
-# Download MoxNAS from GitHub
-wget -O moxnas.tar.gz https://github.com/Mezraniwassim/MoxNas/archive/refs/heads/master.tar.gz
-tar -xzf moxnas.tar.gz --strip-components=1
-rm moxnas.tar.gz
+# Copy MoxNAS from local directory (use local version with fixes)
+if [ -d "$LOCAL_SOURCE" ]; then
+    msg_info "Using local MoxNAS source with all fixes applied"
+    cp -r "$LOCAL_SOURCE"/* .
+    # Remove git directory and other unnecessary files
+    rm -rf .git venv __pycache__ *.pyc instance/
+    msg_ok "MoxNAS files copied from local directory"
+else
+    # Fallback to GitHub if local directory not available
+    msg_info "Local source not found, downloading from GitHub"
+    wget -O moxnas.tar.gz https://github.com/Mezraniwassim/MoxNas/archive/refs/heads/master.tar.gz
+    tar -xzf moxnas.tar.gz --strip-components=1
+    rm moxnas.tar.gz
+    msg_ok "MoxNAS files downloaded from GitHub"
+fi
 
 # Create Python virtual environment (as root)
 python3 -m venv venv
