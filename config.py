@@ -79,9 +79,11 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL') or \
-        'postgresql://moxnas:moxnas@localhost/moxnas_test'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL') or \
+        'sqlite:///test.db'
     WTF_CSRF_ENABLED = False
+    REDIS_URL = os.environ.get('REDIS_URL') or 'memory://'
+    CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL') or 'memory://'
 
 class ProductionConfig(Config):
     """Production configuration"""

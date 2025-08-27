@@ -36,7 +36,7 @@ class SMBManager(ShareProtocolManager):
         """Create SMB share configuration"""
         try:
             # Generate SMB share configuration
-            share_config = f\"\"\"
+            share_config = f"""
 [{share.name}]
     path = {share.dataset.path}
     valid users = {share.owner.username}
@@ -46,7 +46,7 @@ class SMBManager(ShareProtocolManager):
     guest ok = {'yes' if share.guest_access else 'no'}
     create mask = 0755
     directory mask = 0755
-\"\"\"
+"""
             
             # Read current SMB configuration
             smb_content = ''
@@ -78,7 +78,7 @@ class SMBManager(ShareProtocolManager):
             return False, f'Error creating SMB share: {str(e)}'
     
     def delete_smb_share(self, share: Share) -> Tuple[bool, str]:
-        \"\"\"Delete SMB share configuration\"\"\"
+        """Delete SMB share configuration"""
         try:
             if not os.path.exists(self.smb_config_path):
                 return True, 'SMB configuration file not found'
@@ -120,7 +120,7 @@ class SMBManager(ShareProtocolManager):
             return False, f'Error deleting SMB share: {str(e)}'
     
     def get_smb_connections(self) -> List[Dict]:
-        \"\"\"Get active SMB connections\"\"\"
+        """Get active SMB connections"""
         connections = []
         
         try:
@@ -148,10 +148,10 @@ class SMBManager(ShareProtocolManager):
         return connections
 
 class NFSManager(ShareProtocolManager):
-    \"\"\"NFS share management\"\"\"
+    """NFS share management"""
     
     def create_nfs_share(self, share: Share) -> Tuple[bool, str]:
-        \"\"\"Create NFS export\"\"\"
+        """Create NFS export"""
         try:
             # Build export options
             options = []
@@ -171,10 +171,10 @@ class NFSManager(ShareProtocolManager):
             allowed_hosts = share.get_allowed_hosts() or ['*']
             
             # Create export entry
-            export_line = f\"{share.dataset.path}\"
+            export_line = f"{share.dataset.path}"
             for host in allowed_hosts:
-                export_line += f\" {host}({','.join(options)})\"
-            export_line += \"\\n\"
+                export_line += f" {host}({','.join(options)})"
+            export_line += "\n"
             
             # Read current exports
             exports_content = ''
@@ -201,7 +201,7 @@ class NFSManager(ShareProtocolManager):
             return False, f'Error creating NFS share: {str(e)}'
     
     def delete_nfs_share(self, share: Share) -> Tuple[bool, str]:
-        \"\"\"Delete NFS export\"\"\"
+        """Delete NFS export"""
         try:
             if not os.path.exists(self.nfs_exports_path):
                 return True, 'NFS exports file not found'
@@ -240,7 +240,7 @@ class NFSManager(ShareProtocolManager):
             return False, f'Error deleting NFS share: {str(e)}'
     
     def get_nfs_connections(self) -> List[Dict]:
-        \"\"\"Get active NFS connections\"\"\"
+        """Get active NFS connections"""
         connections = []
         
         try:
@@ -265,10 +265,10 @@ class NFSManager(ShareProtocolManager):
         return connections
 
 class FTPManager(ShareProtocolManager):
-    \"\"\"FTP share management\"\"\"
+    """FTP share management"""
     
     def create_ftp_share(self, share: Share) -> Tuple[bool, str]:
-        \"\"\"Configure FTP access for share\"\"\"
+        """Configure FTP access for share"""
         try:
             # For FTP, we typically create a symbolic link in the FTP root
             # to the actual dataset path
@@ -301,7 +301,7 @@ class FTPManager(ShareProtocolManager):
             return False, f'Error creating FTP share: {str(e)}'
     
     def delete_ftp_share(self, share: Share) -> Tuple[bool, str]:
-        \"\"\"Delete FTP share\"\"\"
+        """Delete FTP share"""
         try:
             ftp_root = '/srv/ftp'
             ftp_share_path = os.path.join(ftp_root, share.name)
@@ -318,7 +318,7 @@ class FTPManager(ShareProtocolManager):
             return False, f'Error deleting FTP share: {str(e)}'
     
     def get_ftp_connections(self) -> List[Dict]:
-        \"\"\"Get active FTP connections\"\"\"
+        """Get active FTP connections"""
         connections = []
         
         try:
@@ -352,7 +352,7 @@ nfs_manager = NFSManager()
 ftp_manager = FTPManager()
 
 def get_protocol_manager(protocol: ShareProtocol):
-    \"\"\"Get appropriate protocol manager\"\"\"
+    """Get appropriate protocol manager"""
     managers = {
         ShareProtocol.SMB: smb_manager,
         ShareProtocol.NFS: nfs_manager,

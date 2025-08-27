@@ -11,7 +11,7 @@ from datetime import datetime
 @bp.route('/')
 @login_required
 def index():
-    \"\"\"Storage overview page\"\"\"
+    """Storage overview page"""
     pools = StoragePool.query.all()
     devices = StorageDevice.query.all()
     
@@ -39,7 +39,7 @@ def index():
 @bp.route('/devices')
 @login_required
 def devices():
-    \"\"\"Storage devices page\"\"\"
+    """Storage devices page"""
     page = request.args.get('page', 1, type=int)
     devices = StorageDevice.query.paginate(
         page=page, per_page=20, error_out=False
@@ -50,7 +50,7 @@ def devices():
 @bp.route('/devices/scan', methods=['POST'])
 @login_required
 def scan_devices():
-    \"\"\"Scan for new storage devices\"\"\"
+    """Scan for new storage devices"""
     if not current_user.is_admin():
         return jsonify({'success': False, 'error': 'Administrator privileges required'}), 403
     
@@ -80,7 +80,7 @@ def scan_devices():
 @bp.route('/devices/<int:device_id>/smart')
 @login_required
 def device_smart_data(device_id):
-    \"\"\"Get SMART data for a specific device\"\"\"
+    """Get SMART data for a specific device"""
     device = StorageDevice.query.get_or_404(device_id)
     
     # Get fresh SMART data
@@ -103,7 +103,7 @@ def device_smart_data(device_id):
 @bp.route('/pools')
 @login_required
 def pools():
-    \"\"\"Storage pools page\"\"\"
+    """Storage pools page"""
     page = request.args.get('page', 1, type=int)
     pools = StoragePool.query.paginate(
         page=page, per_page=20, error_out=False
@@ -114,7 +114,7 @@ def pools():
 @bp.route('/pools/create', methods=['GET', 'POST'])
 @login_required
 def create_pool():
-    \"\"\"Create new storage pool\"\"\"
+    """Create new storage pool"""
     if not current_user.is_admin():
         flash('Administrator privileges required to create storage pools', 'danger')
         return redirect(url_for('storage.pools'))
@@ -215,7 +215,7 @@ def create_pool():
 @bp.route('/pools/<int:pool_id>')
 @login_required
 def pool_detail(pool_id):
-    \"\"\"Storage pool detail page\"\"\"
+    """Storage pool detail page"""
     pool = StoragePool.query.get_or_404(pool_id)
     
     # Get pool status from system
@@ -228,7 +228,7 @@ def pool_detail(pool_id):
 @bp.route('/pools/<int:pool_id>/scrub', methods=['POST'])
 @login_required
 def start_pool_scrub(pool_id):
-    \"\"\"Start scrubbing a storage pool\"\"\"
+    """Start scrubbing a storage pool"""
     if not current_user.is_admin():
         return jsonify({'success': False, 'error': 'Administrator privileges required'}), 403
     
@@ -275,7 +275,7 @@ def start_pool_scrub(pool_id):
 @bp.route('/pools/<int:pool_id>/delete', methods=['POST'])
 @login_required
 def delete_pool(pool_id):
-    \"\"\"Delete a storage pool\"\"\"
+    """Delete a storage pool"""
     if not current_user.is_admin():
         return jsonify({'success': False, 'error': 'Administrator privileges required'}), 403
     
@@ -333,7 +333,7 @@ def delete_pool(pool_id):
 @bp.route('/datasets')
 @login_required
 def datasets():
-    \"\"\"Datasets page\"\"\"
+    """Datasets page"""
     page = request.args.get('page', 1, type=int)
     datasets = Dataset.query.paginate(
         page=page, per_page=20, error_out=False
@@ -344,7 +344,7 @@ def datasets():
 @bp.route('/datasets/create', methods=['GET', 'POST'])
 @login_required
 def create_dataset():
-    \"\"\"Create new dataset\"\"\"
+    """Create new dataset"""
     if not current_user.is_admin():
         flash('Administrator privileges required to create datasets', 'danger')
         return redirect(url_for('storage.datasets'))
@@ -424,7 +424,7 @@ def create_dataset():
 @bp.route('/api/pools/<int:pool_id>/status')
 @login_required
 def api_pool_status(pool_id):
-    \"\"\"API endpoint for pool status\"\"\"
+    """API endpoint for pool status"""
     pool = StoragePool.query.get_or_404(pool_id)
     status = storage_manager.get_raid_status(pool)
     
@@ -438,7 +438,7 @@ def api_pool_status(pool_id):
 @bp.route('/api/devices/health')
 @login_required
 def api_device_health():
-    \"\"\"API endpoint for device health overview\"\"\"
+    """API endpoint for device health overview"""
     devices = StorageDevice.query.all()
     
     health_summary = {

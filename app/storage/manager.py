@@ -59,7 +59,7 @@ class StorageManager:
             for device in lsblk_data.get('blockdevices', []):
                 if device.get('type') == 'disk' and not device.get('mountpoint'):
                     # Get additional device information
-                    device_path = f\"/dev/{device['name']}\"
+                    device_path = f"/dev/{device['name']}"
                     device_info = self._get_device_details(device_path)
                     
                     if device_info:
@@ -150,7 +150,7 @@ class StorageManager:
     
     def create_raid_array(self, name: str, level: str, devices: List[str], 
                          filesystem: str = 'ext4') -> Tuple[bool, str]:
-        \"\"\"Create RAID array using mdadm\"\"\"
+        """Create RAID array using mdadm"""
         
         # Validate inputs
         if level not in ['raid0', 'raid1', 'raid5', 'raid10']:
@@ -215,7 +215,7 @@ class StorageManager:
             return False, f'Unexpected error creating RAID array: {str(e)}'
     
     def delete_raid_array(self, pool: StoragePool) -> Tuple[bool, str]:
-        \"\"\"Delete RAID array and cleanup\"\"\"
+        """Delete RAID array and cleanup"""
         try:
             raid_device = f'/dev/md/{pool.name}'
             
@@ -248,7 +248,7 @@ class StorageManager:
             return False, f'Unexpected error deleting RAID array: {str(e)}'
     
     def scrub_raid_array(self, pool: StoragePool) -> Tuple[bool, str]:
-        \"\"\"Start scrubbing/checking RAID array\"\"\"
+        """Start scrubbing/checking RAID array"""
         try:
             raid_device = f'/dev/md/{pool.name}'
             
@@ -270,7 +270,7 @@ class StorageManager:
             return False, f'Unexpected error starting scrub: {str(e)}'
     
     def get_raid_status(self, pool: StoragePool) -> Dict:
-        \"\"\"Get detailed RAID array status\"\"\"
+        """Get detailed RAID array status"""
         raid_device = f'/dev/md/{pool.name}'
         status = {
             'name': pool.name,
@@ -317,7 +317,7 @@ class StorageManager:
         return status
     
     def _get_min_devices_for_raid(self, level: str) -> int:
-        \"\"\"Get minimum devices required for RAID level\"\"\"
+        """Get minimum devices required for RAID level"""
         min_devices = {
             'raid0': 2,
             'raid1': 2,
@@ -327,7 +327,7 @@ class StorageManager:
         return min_devices.get(level, 2)
     
     def _parse_size(self, size_str: str) -> int:
-        \"\"\"Parse size string to bytes\"\"\"
+        """Parse size string to bytes"""
         if not size_str or size_str == '0':
             return 0
         
@@ -358,7 +358,7 @@ class StorageManager:
             return 0
     
     def _get_device_size(self, device_path: str) -> int:
-        \"\"\"Get device size in bytes\"\"\"
+        """Get device size in bytes"""
         success, stdout, stderr = self.run_command(['blockdev', '--getsize64', device_path])
         if success:
             try:
@@ -368,7 +368,7 @@ class StorageManager:
         return 0
     
     def update_device_database(self):
-        \"\"\"Update database with current device information\"\"\"
+        """Update database with current device information"""
         try:
             devices = self.scan_storage_devices()
             

@@ -17,7 +17,7 @@ from app.models import User, SystemLog, LogLevel, UserRole
 @bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit('5 per minute')
 def login():
-    \"\"\"Secure login with rate limiting and account lockout\"\"\"
+    """Secure login with rate limiting and account lockout"""
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
     
@@ -118,7 +118,7 @@ def login():
 
 @bp.route('/logout')
 def logout():
-    \"\"\"Secure logout\"\"\"
+    """Secure logout"""
     if current_user.is_authenticated:
         SystemLog.log_event(
             level=LogLevel.INFO,
@@ -136,7 +136,7 @@ def logout():
 @bp.route('/change_password', methods=['GET', 'POST'])
 @login_required
 def change_password():
-    \"\"\"Change password with security validation\"\"\"
+    """Change password with security validation"""
     form = PasswordChangeForm()
     if form.validate_on_submit():
         if not current_user.check_password(form.current_password.data):
@@ -170,7 +170,7 @@ def change_password():
 @bp.route('/users')
 @login_required
 def users():
-    \"\"\"List all users (admin only)\"\"\"
+    """List all users (admin only)"""
     if not current_user.is_admin():
         flash('Access denied. Administrator privileges required.', 'danger')
         return redirect(url_for('main.dashboard'))
@@ -184,7 +184,7 @@ def users():
 @bp.route('/users/create', methods=['GET', 'POST'])
 @login_required
 def create_user():
-    \"\"\"Create new user (admin only)\"\"\"
+    """Create new user (admin only)"""
     if not current_user.is_admin():
         flash('Access denied. Administrator privileges required.', 'danger')
         return redirect(url_for('main.dashboard'))
@@ -220,7 +220,7 @@ def create_user():
 @bp.route('/users/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_user(id):
-    \"\"\"Edit user (admin only)\"\"\"
+    """Edit user (admin only)"""
     if not current_user.is_admin():
         flash('Access denied. Administrator privileges required.', 'danger')
         return redirect(url_for('main.dashboard'))
@@ -262,7 +262,7 @@ def edit_user(id):
             SystemLog.log_event(
                 level=LogLevel.INFO,
                 category='auth',
-                message=f'User {user.username} updated by {current_user.username}: {\";\".join(changes)}',
+                message=f'User {user.username} updated by {current_user.username}: {";".join(changes)}',
                 user_id=current_user.id,
                 ip_address=request.remote_addr,
                 details={'modified_user_id': user.id, 'changes': changes}
@@ -284,7 +284,7 @@ def edit_user(id):
 @bp.route('/users/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_user(id):
-    \"\"\"Delete user (admin only)\"\"\"
+    """Delete user (admin only)"""
     if not current_user.is_admin():
         flash('Access denied. Administrator privileges required.', 'danger')
         return redirect(url_for('main.dashboard'))
@@ -314,7 +314,7 @@ def delete_user(id):
 @bp.route('/2fa/setup', methods=['GET', 'POST'])
 @login_required
 def setup_2fa():
-    \"\"\"Setup two-factor authentication\"\"\"
+    """Setup two-factor authentication"""
     if current_user.totp_enabled:
         flash('Two-factor authentication is already enabled', 'info')
         return redirect(url_for('main.dashboard'))
@@ -397,7 +397,7 @@ def setup_2fa():
 @bp.route('/2fa/disable', methods=['GET', 'POST'])
 @login_required
 def disable_2fa():
-    \"\"\"Disable two-factor authentication\"\"\"
+    """Disable two-factor authentication"""
     if not current_user.totp_enabled:
         flash('Two-factor authentication is not enabled', 'info')
         return redirect(url_for('main.dashboard'))

@@ -28,7 +28,7 @@ class PasswordChangeForm(FlaskForm):
     submit = SubmitField('Change Password')
     
     def validate_new_password(self, field):
-        \"\"\"Validate password strength\"\"\"
+        """Validate password strength"""
         password = field.data
         
         # Check for at least one uppercase letter
@@ -75,7 +75,7 @@ class UserRegistrationForm(FlaskForm):
     submit = SubmitField('Create User')
     
     def validate_username(self, field):
-        \"\"\"Check if username is available\"\"\"
+        """Check if username is available"""
         user = User.query.filter_by(username=field.data).first()
         if user:
             raise ValidationError('Username already exists. Please choose a different one.')
@@ -85,13 +85,13 @@ class UserRegistrationForm(FlaskForm):
             raise ValidationError('Username can only contain letters, numbers, hyphens, and underscores')
     
     def validate_email(self, field):
-        \"\"\"Check if email is available\"\"\"
+        """Check if email is available"""
         user = User.query.filter_by(email=field.data).first()
         if user:
             raise ValidationError('Email already registered. Please use a different email address.')
     
     def validate_password(self, field):
-        \"\"\"Validate password strength\"\"\"
+        """Validate password strength"""
         password = field.data
         
         # Check for at least one uppercase letter
@@ -128,21 +128,21 @@ class UserEditForm(FlaskForm):
         self.original_user = original_user
     
     def validate_username(self, field):
-        \"\"\"Check if username is available (excluding current user)\"\"\"
+        """Check if username is available (excluding current user)"""
         if field.data != self.original_user.username:
             user = User.query.filter_by(username=field.data).first()
             if user:
                 raise ValidationError('Username already exists. Please choose a different one.')
     
     def validate_email(self, field):
-        \"\"\"Check if email is available (excluding current user)\"\"\"
+        """Check if email is available (excluding current user)"""
         if field.data != self.original_user.email:
             user = User.query.filter_by(email=field.data).first()
             if user:
                 raise ValidationError('Email already registered. Please use a different email address.')
 
 class TOTPSetupForm(FlaskForm):
-    \"\"\"Two-factor authentication setup form\"\"\"
+    """Two-factor authentication setup form"""
     totp_code = StringField('Verification Code', validators=[
         DataRequired(),
         Length(min=6, max=6, message='Verification code must be 6 digits')
@@ -150,12 +150,12 @@ class TOTPSetupForm(FlaskForm):
     submit = SubmitField('Enable 2FA')
     
     def validate_totp_code(self, field):
-        \"\"\"Validate TOTP code format\"\"\"
+        """Validate TOTP code format"""
         if not field.data.isdigit():
             raise ValidationError('Verification code must contain only digits')
 
 class TOTPDisableForm(FlaskForm):
-    \"\"\"Two-factor authentication disable form\"\"\"
+    """Two-factor authentication disable form"""
     password = PasswordField('Current Password', validators=[DataRequired()])
     totp_code = StringField('Current 2FA Code', validators=[
         DataRequired(),
@@ -164,17 +164,17 @@ class TOTPDisableForm(FlaskForm):
     submit = SubmitField('Disable 2FA')
     
     def validate_totp_code(self, field):
-        \"\"\"Validate TOTP code format\"\"\"
+        """Validate TOTP code format"""
         if not field.data.isdigit():
             raise ValidationError('Verification code must contain only digits')
 
 class PasswordResetRequestForm(FlaskForm):
-    \"\"\"Password reset request form\"\"\"
+    """Password reset request form"""
     email = StringField('Email', validators=[DataRequired(), Email()])
     submit = SubmitField('Request Password Reset')
 
 class PasswordResetForm(FlaskForm):
-    \"\"\"Password reset form\"\"\"
+    """Password reset form"""
     password = PasswordField('New Password', validators=[
         DataRequired(),
         Length(min=8, max=128, message='Password must be between 8 and 128 characters long')
@@ -186,7 +186,7 @@ class PasswordResetForm(FlaskForm):
     submit = SubmitField('Reset Password')
     
     def validate_password(self, field):
-        \"\"\"Validate password strength\"\"\"
+        """Validate password strength"""
         password = field.data
         
         # Check for at least one uppercase letter
