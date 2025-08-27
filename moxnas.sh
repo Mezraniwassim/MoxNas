@@ -129,10 +129,10 @@ EOF
 # Initialize database
 sudo -u moxnas bash -c 'cd /opt/moxnas && source venv/bin/activate && python migrate.py'
 
-# Create admin user
+# Create admin user with updated User model
 sudo -u moxnas bash -c 'cd /opt/moxnas && source venv/bin/activate && python -c \"
 from app import create_app, db
-from app.models import User
+from app.models import User, UserRole
 from werkzeug.security import generate_password_hash
 
 app = create_app(\\\"production\\\")
@@ -142,9 +142,12 @@ with app.app_context():
         admin = User(
             username=\\\"admin\\\",
             email=\\\"admin@moxnas.local\\\",
-            password_hash=generate_password_hash(\\\"moxnas1234\\\"),
-            is_admin=True
+            first_name=\\\"System\\\",
+            last_name=\\\"Administrator\\\",
+            role=UserRole.ADMIN,
+            is_active=True
         )
+        admin.set_password(\\\"moxnas1234\\\")
         db.session.add(admin)
         db.session.commit()
         print(\\\"Admin user created\\\")
