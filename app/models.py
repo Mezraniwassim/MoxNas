@@ -85,14 +85,14 @@ class User(UserMixin, db.Model):
     backup_jobs = db.relationship('BackupJob', backref='created_by_user', lazy='dynamic')
     
     def set_password(self, password):
-        \"\"\"Hash and set password with security checks\"\"\"
+        """Hash and set password with security checks"""
         if len(password) < 8:
             raise ValueError('Password must be at least 8 characters long')
         self.password_hash = generate_password_hash(password)
         self.last_password_change = datetime.utcnow()
     
     def check_password(self, password):
-        \"\"\"Check password and handle failed attempts\"\"\"
+        """Check password and handle failed attempts"""
         if self.is_locked():
             return False
             
@@ -109,7 +109,7 @@ class User(UserMixin, db.Model):
             return False
     
     def is_locked(self):
-        \"\"\"Check if account is locked\"\"\"
+        """Check if account is locked"""
         if self.locked_until and datetime.utcnow() < self.locked_until:
             return True
         if self.locked_until and datetime.utcnow() >= self.locked_until:
@@ -119,7 +119,7 @@ class User(UserMixin, db.Model):
         return False
     
     def unlock_account(self):
-        \"\"\"Unlock account (admin function)\"\"\"
+        """Unlock account (admin function)"""
         self.locked_until = None
         self.failed_login_attempts = 0
     
@@ -130,7 +130,7 @@ class User(UserMixin, db.Model):
         return f'<User {self.username}>'
 
 class StorageDevice(db.Model):
-    \"\"\"Physical storage device model\"\"\"
+    """Physical storage device model"""
     __tablename__ = 'storage_devices'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -155,7 +155,7 @@ class StorageDevice(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def update_smart_data(self, smart_info):
-        \"\"\"Update SMART data and status\"\"\"
+        """Update SMART data and status"""
         self.smart_data = json.dumps(smart_info)
         self.updated_at = datetime.utcnow()
         
@@ -168,7 +168,7 @@ class StorageDevice(db.Model):
             self.status = DeviceStatus.HEALTHY
     
     def get_smart_data(self):
-        \"\"\"Get parsed SMART data\"\"\"
+        """Get parsed SMART data"""
         if self.smart_data:
             return json.loads(self.smart_data)
         return {}
@@ -177,7 +177,7 @@ class StorageDevice(db.Model):
         return f'<StorageDevice {self.device_name}>'
 
 class StoragePool(db.Model):
-    \"\"\"Storage pool (RAID) model\"\"\"
+    """Storage pool (RAID) model"""
     __tablename__ = 'storage_pools'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -211,12 +211,12 @@ class StoragePool(db.Model):
     created_by = db.relationship('User', backref='created_pools')
     
     def calculate_usage(self):
-        \"\"\"Calculate current usage statistics\"\"\"
+        """Calculate current usage statistics"""
         # This would be implemented with actual filesystem calls
         pass
     
     def start_scrub(self):
-        \"\"\"Start a scrub operation\"\"\"
+        """Start a scrub operation"""
         self.status = PoolStatus.SCRUBBING
         self.scrub_progress = 0
     
@@ -224,7 +224,7 @@ class StoragePool(db.Model):
         return f'<StoragePool {self.name}>'
 
 class Dataset(db.Model):
-    \"\"\"Dataset (directory/filesystem) model\"\"\"
+    """Dataset (directory/filesystem) model"""
     __tablename__ = 'datasets'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -254,7 +254,7 @@ class Dataset(db.Model):
         return f'<Dataset {self.name}>'
 
 class Share(db.Model):
-    \"\"\"Network share model\"\"\"
+    """Network share model"""
     __tablename__ = 'shares'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -287,20 +287,20 @@ class Share(db.Model):
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref='created_shares')
     
     def get_allowed_hosts(self):
-        \"\"\"Get list of allowed hosts\"\"\"
+        """Get list of allowed hosts"""
         if self.allowed_hosts:
             return json.loads(self.allowed_hosts)
         return []
     
     def set_allowed_hosts(self, hosts):
-        \"\"\"Set allowed hosts list\"\"\"
+        """Set allowed hosts list"""
         self.allowed_hosts = json.dumps(hosts)
     
     def __repr__(self):
         return f'<Share {self.name}>'
 
 class BackupJob(db.Model):
-    \"\"\"Backup job model\"\"\"
+    """Backup job model"""
     __tablename__ = 'backup_jobs'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -336,7 +336,7 @@ class BackupJob(db.Model):
         return f'<BackupJob {self.name}>'
 
 class SystemLog(db.Model):
-    \"\"\"System audit and event log\"\"\"
+    """System audit and event log"""
     __tablename__ = 'system_logs'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -358,7 +358,7 @@ class SystemLog(db.Model):
     
     @staticmethod
     def log_event(level, category, message, user_id=None, ip_address=None, details=None):
-        \"\"\"Create a log entry\"\"\"
+        """Create a log entry"""
         log_entry = SystemLog(
             level=level,
             category=category,
@@ -371,7 +371,7 @@ class SystemLog(db.Model):
         db.session.commit()
     
     def get_details(self):
-        \"\"\"Get parsed details\"\"\"
+        """Get parsed details"""
         if self.details:
             return json.loads(self.details)
         return {}
@@ -380,7 +380,7 @@ class SystemLog(db.Model):
         return f'<SystemLog {self.level.value}: {self.message[:50]}>'
 
 class Alert(db.Model):
-    \"\"\"System alert model\"\"\"
+    """System alert model"""
     __tablename__ = 'alerts'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -406,7 +406,7 @@ class Alert(db.Model):
     acknowledged_by = db.relationship('User', backref='acknowledged_alerts')
     
     def acknowledge(self, user_id):
-        \"\"\"Acknowledge the alert\"\"\"
+        """Acknowledge the alert"""
         self.acknowledged_at = datetime.utcnow()
         self.acknowledged_by_id = user_id
         self.is_active = False
