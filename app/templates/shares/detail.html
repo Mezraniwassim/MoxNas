@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Share Details: {{ share.name }} - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Share: {{ share.name }}</h1>
+        <div>
+            <a href="{{ url_for('shares.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Shares
+            </a>
+            <button class="btn btn-{{ 'warning' if share.status.value == 'active' else 'success' }}" 
+                    onclick="toggleShare({{ share.id }}, '{{ share.name }}', '{{ share.status.value }}')">
+                <i class="bi bi-{{ 'pause' if share.status.value == 'active' else 'play' }}"></i> 
+                {{ 'Disable' if share.status.value == 'active' else 'Enable' }}
+            </button>
+            <button class="btn btn-danger" onclick="deleteShare({{ share.id }}, '{{ share.name }}')">
+                <i class="bi bi-trash"></i> Delete Share
+            </button>
+        </div>
+    </div>
+
+    <!-- Share Overview -->
+    <div class="row">
+        <!-- Share Info -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Share Information</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Name:</strong></td>
+                            <td>{{ share.name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Protocol:</strong></td>
+                            <td>
+                                <span class="badge bg-info">{{ share.protocol.value.upper() }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Dataset:</strong></td>
+                            <td>
+                                <a href="{{ url_for('storage.pool_detail', pool_id=share.dataset.pool.id) }}" class="text-decoration-none">
+                                    {{ share.dataset.name }}
+                                </a>
+                                <br><small class="text-muted">{{ share.dataset.pool.name }}</small>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Path:</strong></td>
+                            <td><code>{{ share.dataset.path }}</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% set status = share.status.value if share.status else 'unknown' %}
+                                <span class="badge bg-{{ 'success' if status == 'active' else 'secondary' if status == 'inactive' else 'danger' }}">
+                                    {{ status.title() }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Owner:</strong></td>
+                            <td>{{ share.owner.username if share.owner else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>{{ share.created_at.strftime('%Y-%m-%d %H:%M') if share.created_at else 'Unknown' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Settings -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Share Settings</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Access Type:</strong></td>
+                            <td>
+                                <span class="badge bg-{{ 'warning' if share.read_only else 'success' }}">
+                                    {{ 'Read-Only' if share.read_only else 'Read-Write' }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Guest Access:</strong></td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if share.guest_access else 'secondary' }}">
+                                    {{ 'Enabled' if share.guest_access else 'Disabled' }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Allowed Hosts:</strong></td>
+                            <td>
+                                {% if share.get_allowed_hosts() %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for host in share.get_allowed_hosts() %}
+                                            <span class="badge bg-secondary">{{ host }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">All hosts allowed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if share.protocol.value == 'smb' %}
+                        <tr>
+                            <td><strong>SMB Path:</strong></td>
+                            <td><code>\\\\{{ request.host.split(':')[0] }}\\{{ share.name }}</code></td>
+                        </tr>
+                        {% elif share.protocol.value == 'nfs' %}
+                        <tr>
+                            <td><strong>NFS Mount:</strong></td>
+                            <td><code>{{ request.host.split(':')[0] }}:{{ share.dataset.path }}</code></td>
+                        </tr>
+                        {% elif share.protocol.value == 'ftp' %}
+                        <tr>
+                            <td><strong>FTP URL:</strong></td>
+                            <td><code>ftp://{{ request.host.split(':')[0] }}/{{ share.name }}</code></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Connections -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Active Connections</h6>
+                </div>
+                <div class="card-body">
+                    {% if connections %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Client IP</th>
+                                        <th>User</th>
+                                        <th>Connected Since</th>
+                                        <th>Files Open</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for connection in connections %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ connection.client_ip }}</strong>
+                                            {% if connection.hostname %}
+                                                <br><small class="text-muted">{{ connection.hostname }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ connection.username or 'Anonymous' }}</td>
+                                        <td>{{ connection.connected_since.strftime('%Y-%m-%d %H:%M:%S') if connection.connected_since else 'Unknown' }}</td>
+                                        <td>
+                                            {% if connection.open_files %}
+                                                <span class="badge bg-info">{{ connection.open_files }} files</span>
+                                            {% else %}
+                                                <span class="text-muted">None</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-warning" 
+                                                    onclick="disconnectClient('{{ connection.session_id }}', '{{ connection.client_ip }}')">
+                                                <i class="bi bi-x-circle"></i> Disconnect
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-people display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">No Active Connections</h5>
+                            <p class="text-muted">No clients are currently connected to this share.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Usage Statistics -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Active Connections
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ connections|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-people text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Dataset Size
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% if share.dataset.used_size %}
+                                    {{ "%.1f"|format(share.dataset.used_size / 1024**3) }} GB
+                                {% else %}
+                                    0 GB
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hdd text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Protocol
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ share.protocol.value.upper() }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-share text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Uptime
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% if share.last_accessed %}
+                                    {{ ((share.last_accessed - share.created_at).days if share.created_at else 0) }}d
+                                {% else %}
+                                    0d
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-clock text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Instructions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Connection Instructions</h6>
+                </div>
+                <div class="card-body">
+                    {% if share.protocol.value == 'smb' %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Windows</h6>
+                            <p>Open File Explorer and enter in the address bar:</p>
+                            <div class="bg-light p-2 rounded font-monospace">
+                                \\{{ request.host.split(':')[0] }}\{{ share.name }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>macOS/Linux</h6>
+                            <p>Use the following command:</p>
+                            <div class="bg-light p-2 rounded font-monospace">
+                                smb://{{ request.host.split(':')[0] }}/{{ share.name }}
+                            </div>
+                        </div>
+                    </div>
+                    {% elif share.protocol.value == 'nfs' %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Linux/Unix Mount</h6>
+                            <div class="bg-light p-2 rounded font-monospace">
+                                sudo mount -t nfs {{ request.host.split(':')[0] }}:{{ share.dataset.path }} /mnt/{{ share.name }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>macOS Mount</h6>
+                            <div class="bg-light p-2 rounded font-monospace">
+                                mount -t nfs {{ request.host.split(':')[0] }}:{{ share.dataset.path }} /Volumes/{{ share.name }}
+                            </div>
+                        </div>
+                    </div>
+                    {% elif share.protocol.value == 'ftp' %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>FTP Client</h6>
+                            <p>Connect using any FTP client:</p>
+                            <div class="bg-light p-2 rounded">
+                                <strong>Server:</strong> {{ request.host.split(':')[0] }}<br>
+                                <strong>Port:</strong> 21<br>
+                                <strong>Path:</strong> /{{ share.name }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Command Line</h6>
+                            <div class="bg-light p-2 rounded font-monospace">
+                                ftp {{ request.host.split(':')[0] }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if not share.guest_access %}
+                    <div class="alert alert-info mt-3" role="alert">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Authentication Required:</strong> You will need valid credentials to access this share.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleShare(shareId, shareName, currentStatus) {
+    const action = currentStatus === 'active' ? 'disable' : 'enable';
+    if (confirm(`Are you sure you want to ${action} share "${shareName}"?`)) {
+        fetch(`/shares/${shareId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(`Error ${action}ing share: ` + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(`Failed to ${action} share`);
+        });
+    }
+}
+
+function deleteShare(shareId, shareName) {
+    if (confirm(`Are you sure you want to delete share "${shareName}"? This cannot be undone.`)) {
+        fetch(`/shares/${shareId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/shares/';
+            } else {
+                alert('Error deleting share: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete share');
+        });
+    }
+}
+
+function disconnectClient(sessionId, clientIp) {
+    if (confirm(`Are you sure you want to disconnect client ${clientIp}?`)) {
+        fetch(`/shares/disconnect/${sessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error disconnecting client: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to disconnect client');
+        });
+    }
+}
+
+// Auto-refresh connections every 30 seconds
+setInterval(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

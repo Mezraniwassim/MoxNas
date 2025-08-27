@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block title %}Pool Details: {{ pool.name }} - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Storage Pool: {{ pool.name }}</h1>
+        <div>
+            <a href="{{ url_for('storage.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Storage
+            </a>
+            <a href="{{ url_for('storage.edit_pool', pool_id=pool.id) }}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Edit Pool
+            </a>
+            {% if pool.status.value != 'scrubbing' %}
+            <button class="btn btn-warning" onclick="startScrub({{ pool.id }})">
+                <i class="bi bi-tools"></i> Start Scrub
+            </button>
+            {% endif %}
+            <button class="btn btn-danger" onclick="deletePool({{ pool.id }}, '{{ pool.name }}')">
+                <i class="bi bi-trash"></i> Delete Pool
+            </button>
+        </div>
+    </div>
+
+    <!-- Pool Overview -->
+    <div class="row">
+        <!-- Pool Info -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Pool Information</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Name:</strong></td>
+                            <td>{{ pool.name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>RAID Level:</strong></td>
+                            <td>{{ pool.raid_level.upper() }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Filesystem:</strong></td>
+                            <td>{{ pool.filesystem_type }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mount Point:</strong></td>
+                            <td><code>{{ pool.mount_point }}</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% set status = pool.status.value if pool.status else 'unknown' %}
+                                <span class="badge bg-{{ 'success' if status == 'healthy' else 'warning' if status == 'degraded' else 'info' if status == 'scrubbing' else 'danger' }}">
+                                    {{ status.title() }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>{{ pool.created_at.strftime('%Y-%m-%d %H:%M') if pool.created_at else 'Unknown' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Last Scrub:</strong></td>
+                            <td>
+                                {% if pool.last_scrub %}
+                                    {{ pool.last_scrub.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage Usage -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Storage Usage</h6>
+                </div>
+                <div class="card-body">
+                    {% if pool.total_size %}
+                        {% set used_gb = (pool.used_size / 1024**3) if pool.used_size else 0 %}
+                        {% set total_gb = pool.total_size / 1024**3 %}
+                        {% set available_gb = total_gb - used_gb %}
+                        {% set usage_percent = (used_gb / total_gb * 100) if total_gb > 0 else 0 %}
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Space Used</span>
+                                <span>{{ "%.1f"|format(usage_percent) }}%</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-{{ 'danger' if usage_percent > 90 else 'warning' if usage_percent > 75 else 'success' }}" 
+                                     style="width: {{ usage_percent }}%"></div>
+                            </div>
+                        </div>
+                        
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td><strong>Total Size:</strong></td>
+                                <td>{{ "%.1f"|format(total_gb) }} GB</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Used:</strong></td>
+                                <td>{{ "%.1f"|format(used_gb) }} GB</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Available:</strong></td>
+                                <td>{{ "%.1f"|format(available_gb) }} GB</td>
+                            </tr>
+                        </table>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-exclamation-circle display-4"></i>
+                            <p class="mt-2">Storage information unavailable</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scrub Progress (if running) -->
+    {% if pool.status and pool.status.value == 'scrubbing' %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Scrub in Progress</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Scrub Progress</span>
+                        <span>{{ pool.scrub_progress or 0 }}%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" 
+                             style="width: {{ pool.scrub_progress or 0 }}%"></div>
+                    </div>
+                    <small class="text-muted">Checking data integrity and repairing any errors found</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pool Devices -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Pool Devices</h6>
+                </div>
+                <div class="card-body">
+                    {% if pool.devices %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Device</th>
+                                        <th>Model</th>
+                                        <th>Serial</th>
+                                        <th>Size</th>
+                                        <th>Status</th>
+                                        <th>Temperature</th>
+                                        <th>Health</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for device in pool.devices %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ device.device_path }}</strong><br>
+                                            <small class="text-muted">{{ device.device_name }}</small>
+                                        </td>
+                                        <td>{{ device.device_model or 'Unknown' }}</td>
+                                        <td>
+                                            <small class="font-monospace">{{ device.device_serial or 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            {% if device.device_size %}
+                                                {{ "%.1f"|format(device.device_size / 1024**3) }} GB
+                                            {% else %}
+                                                Unknown
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set status = device.status.value if device.status else 'unknown' %}
+                                            <span class="badge bg-{{ 'success' if status == 'healthy' else 'warning' if status == 'warning' else 'danger' }}">
+                                                {{ status.title() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if device.temperature %}
+                                                {{ device.temperature }}°C
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if device.smart_data %}
+                                                <span class="text-success">
+                                                    <i class="bi bi-check-circle"></i> OK
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-device-hdd display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">No devices assigned</h5>
+                            <p class="text-muted">This pool has no devices assigned to it.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pool Datasets -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Datasets</h6>
+                    <a href="{{ url_for('storage.create_dataset') }}?pool_id={{ pool.id }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus"></i> Add Dataset
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if pool.datasets %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Path</th>
+                                        <th>Quota</th>
+                                        <th>Used</th>
+                                        <th>Usage</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for dataset in pool.datasets %}
+                                    <tr>
+                                        <td><strong>{{ dataset.name }}</strong></td>
+                                        <td><code>{{ dataset.path }}</code></td>
+                                        <td>
+                                            {% if dataset.quota_size %}
+                                                {{ "%.1f"|format(dataset.quota_size / 1024**3) }} GB
+                                            {% else %}
+                                                <span class="text-muted">Unlimited</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if dataset.used_size %}
+                                                {{ "%.1f"|format(dataset.used_size / 1024**3) }} GB
+                                            {% else %}
+                                                0 GB
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if dataset.quota_size and dataset.used_size %}
+                                                {% set usage_percent = (dataset.used_size / dataset.quota_size * 100) %}
+                                                <div class="progress" style="width: 100px;">
+                                                    <div class="progress-bar bg-{{ 'danger' if usage_percent > 90 else 'warning' if usage_percent > 75 else 'success' }}" 
+                                                         style="width: {{ usage_percent }}%"></div>
+                                                </div>
+                                                <small>{{ "%.1f"|format(usage_percent) }}%</small>
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                        onclick="editDataset({{ dataset.id }})">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                        onclick="deleteDataset({{ dataset.id }}, '{{ dataset.name }}')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-folder display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">No datasets</h5>
+                            <p class="text-muted">Create datasets to organize your storage pool.</p>
+                            <a href="{{ url_for('storage.create_dataset') }}?pool_id={{ pool.id }}" class="btn btn-primary">
+                                <i class="bi bi-plus"></i> Create First Dataset
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function startScrub(poolId) {
+    if (confirm('Are you sure you want to start a scrub? This process may take several hours.')) {
+        fetch(`/storage/pools/${poolId}/scrub`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error starting scrub: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to start scrub');
+        });
+    }
+}
+
+function deletePool(poolId, poolName) {
+    if (confirm(`Are you sure you want to delete pool "${poolName}"? This will permanently destroy all data in this pool and cannot be undone.`)) {
+        if (confirm('This action is IRREVERSIBLE. Type the pool name to confirm: ' + poolName)) {
+            fetch(`/storage/pools/${poolId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = '/storage/';
+                } else {
+                    alert('Error deleting pool: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete pool');
+            });
+        }
+    }
+}
+
+function editDataset(datasetId) {
+    // Redirect to dataset edit page
+    window.location.href = `/storage/datasets/${datasetId}/edit`;
+}
+
+function deleteDataset(datasetId, datasetName) {
+    if (confirm(`Are you sure you want to delete dataset "${datasetName}"? This cannot be undone.`)) {
+        fetch(`/storage/datasets/${datasetId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting dataset: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete dataset');
+        });
+    }
+}
+
+// Auto-refresh scrub progress if scrubbing
+{% if pool.status and pool.status.value == 'scrubbing' %}
+setInterval(function() {
+    location.reload();
+}, 10000); // Refresh every 10 seconds
+{% endif %}
+</script>
+{% endblock %}

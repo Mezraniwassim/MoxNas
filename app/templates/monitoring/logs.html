@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}System Logs - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">System Logs</h1>
+        <a href="{{ url_for('monitoring.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Monitoring
+        </a>
+    </div>
+
+    <!-- Log Filters -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Log Filters</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label for="level" class="form-label">Log Level</label>
+                    <select class="form-select" id="level" name="level">
+                        <option value="">All Levels</option>
+                        {% for level in levels %}
+                        <option value="{{ level }}" {% if current_level == level %}selected{% endif %}>
+                            {{ level.upper() }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category }}" {% if current_category == category %}selected{% endif %}>
+                            {{ category.title() }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- System Logs -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">System Events</h6>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshLogs()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="exportLogs()">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="autoRefresh">
+                    <label class="form-check-label small" for="autoRefresh">
+                        Auto-refresh
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if logs.items %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 150px;">Timestamp</th>
+                                <th style="width: 80px;">Level</th>
+                                <th style="width: 100px;">Category</th>
+                                <th style="width: 120px;">User</th>
+                                <th style="width: 120px;">IP Address</th>
+                                <th>Message</th>
+                                <th style="width: 50px;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs.items %}
+                            <tr class="log-row" data-level="{{ log.level.value }}">
+                                <td class="text-nowrap">
+                                    <small class="font-monospace">
+                                        {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% set level = log.level.value %}
+                                    <span class="badge bg-{{ 'danger' if level == 'error' else 'warning' if level == 'warning' else 'info' if level == 'info' else 'secondary' if level == 'debug' else 'success' }}">
+                                        {{ level.upper() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ log.category }}</span>
+                                </td>
+                                <td>
+                                    {% if log.user %}
+                                        <small>{{ log.user.username }}</small>
+                                    {% else %}
+                                        <small class="text-muted">System</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.ip_address %}
+                                        <small class="font-monospace">{{ log.ip_address }}</small>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="log-message">
+                                        {{ log.message }}
+                                        {% if log.details %}
+                                            <button type="button" class="btn btn-sm btn-link p-0 ms-1" 
+                                                    onclick="toggleDetails('log-{{ log.id }}')">
+                                                <i class="bi bi-info-circle"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                    {% if log.details %}
+                                    <div id="log-{{ log.id }}-details" class="log-details mt-2" style="display: none;">
+                                        <div class="border-start border-3 border-primary ps-2">
+                                            <small class="text-muted">
+                                                {% if log.details is string %}
+                                                    {{ log.details }}
+                                                {% else %}
+                                                    <pre class="mb-0">{{ log.details|tojson(indent=2) }}</pre>
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if log.details %}
+                                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                                onclick="toggleDetails('log-{{ log.id }}')">
+                                            <i class="bi bi-chevron-down" id="log-{{ log.id }}-icon"></i>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if logs.pages > 1 %}
+                <div class="card-footer">
+                    <nav aria-label="Log pagination">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if logs.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('monitoring.logs', page=logs.prev_num, level=current_level, category=current_category) }}">Previous</a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for page_num in logs.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != logs.page %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('monitoring.logs', page=page_num, level=current_level, category=current_category) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                    {% endif %}
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if logs.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('monitoring.logs', page=logs.next_num, level=current_level, category=current_category) }}">Next</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-file-text display-1 text-muted"></i>
+                    <h4 class="mt-3 text-muted">No Log Entries</h4>
+                    <p class="text-muted">No log entries match the current filters.</p>
+                    <a href="{{ url_for('monitoring.logs') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-clockwise"></i> Clear Filters
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Log Statistics -->
+    {% if logs.items %}
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Entries
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ logs.total }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-file-text text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                Error Entries
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ logs.items|selectattr('level.value', 'equalto', 'error')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-exclamation-triangle text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Warning Entries
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ logs.items|selectattr('level.value', 'equalto', 'warning')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-exclamation-circle text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Categories
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ categories|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-tags text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let autoRefreshInterval = null;
+
+function toggleDetails(logId) {
+    const details = document.getElementById(logId + '-details');
+    const icon = document.getElementById(logId + '-icon');
+    
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.className = 'bi bi-chevron-up';
+    } else {
+        details.style.display = 'none';
+        icon.className = 'bi bi-chevron-down';
+    }
+}
+
+function refreshLogs() {
+    window.location.reload();
+}
+
+function exportLogs() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    window.open('/monitoring/logs?' + params.toString(), '_blank');
+}
+
+// Auto-refresh functionality
+document.getElementById('autoRefresh').addEventListener('change', function() {
+    if (this.checked) {
+        autoRefreshInterval = setInterval(refreshLogs, 30000); // Refresh every 30 seconds
+    } else {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+});
+
+// Highlight log levels with colors
+document.addEventListener('DOMContentLoaded', function() {
+    const logRows = document.querySelectorAll('.log-row');
+    logRows.forEach(row => {
+        const level = row.getAttribute('data-level');
+        if (level === 'error') {
+            row.classList.add('table-danger');
+        } else if (level === 'warning') {
+            row.classList.add('table-warning');
+        }
+    });
+});
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // R key to refresh
+    if (e.key === 'r' && e.ctrlKey) {
+        e.preventDefault();
+        refreshLogs();
+    }
+    
+    // E key to export
+    if (e.key === 'e' && e.ctrlKey) {
+        e.preventDefault();
+        exportLogs();
+    }
+});
+</script>
+{% endblock %}

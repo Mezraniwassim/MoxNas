@@ -193,7 +193,7 @@
         <div class="card shadow">
             <div class="card-header py-3 d-flex justify-content-between align-items-center">
                 <h6 class="m-0 font-weight-bold text-primary">Recent Backup History</h6>
-                <a href="{{ url_for('backups.history') }}" class="btn btn-sm btn-outline-primary">
+                <a href="{{ url_for('backups.index') }}" class="btn btn-sm btn-outline-primary">
                     View All History <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
@@ -236,7 +236,7 @@
 <script>
 function runBackupJob(jobId) {
     if (confirm('Are you sure you want to run this backup job now?')) {
-        fetch(`{{ url_for('backups.api_run_job', job_id='') }}${jobId}`, {
+        fetch(`/backups/api/jobs/${jobId}/run`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -266,7 +266,7 @@ function runQuickBackup() {
 
 function deleteBackupJob(jobId, jobName) {
     if (confirm(`Are you sure you want to delete backup job "${jobName}"? This cannot be undone.`)) {
-        fetch(`{{ url_for('backups.api_delete_job', job_id='') }}${jobId}`, {
+        fetch(`/backups/api/jobs/${jobId}`, {
             method: 'DELETE',
             headers: {
                 'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')

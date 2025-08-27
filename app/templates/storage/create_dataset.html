@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}Create Dataset - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Create New Dataset</h1>
+        <a href="{{ url_for('storage.datasets') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Datasets
+        </a>
+    </div>
+
+    <!-- Create Dataset Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Dataset Information</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" class="needs-validation" novalidate>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Dataset Name *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                    <div class="form-text">Choose a descriptive name for your dataset</div>
+                                    <div class="invalid-feedback">
+                                        Please provide a valid dataset name.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="pool_id" class="form-label">Storage Pool *</label>
+                                    <select class="form-select" id="pool_id" name="pool_id" required>
+                                        <option value="">Select a storage pool</option>
+                                        {% for pool in pools %}
+                                        <option value="{{ pool.id }}" {% if request.args.get('pool_id') == pool.id|string %}selected{% endif %}>
+                                            {{ pool.name }} ({{ pool.raid_level.upper() }} - 
+                                            {% if pool.total_size %}
+                                                {{ "%.1f"|format(pool.total_size / 1024**3) }} GB
+                                            {% else %}
+                                                Size Unknown
+                                            {% endif %})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Please select a storage pool.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="quota_size" class="form-label">Quota Size (GB)</label>
+                                    <input type="number" class="form-control" id="quota_size" name="quota_size" min="1" step="0.1">
+                                    <div class="form-text">Leave empty for no quota limit</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Estimated Path</label>
+                                    <div class="form-control bg-light" id="preview_path">
+                                        <span class="text-muted">Select pool and enter name to see path</span>
+                                    </div>
+                                    <div class="form-text">This will be the dataset's mount path</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Optional description for this dataset"></textarea>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3">Dataset Options</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="compression" class="form-label">Compression</label>
+                                    <select class="form-select" id="compression" name="compression">
+                                        <option value="off">No Compression</option>
+                                        <option value="lz4" selected>LZ4 (Recommended)</option>
+                                        <option value="gzip">GZIP</option>
+                                        <option value="zstd">ZSTD</option>
+                                    </select>
+                                    <div class="form-text">LZ4 provides good compression with low CPU usage</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="deduplication" class="form-label">Deduplication</label>
+                                    <select class="form-select" id="deduplication" name="deduplication">
+                                        <option value="off" selected>Disabled</option>
+                                        <option value="on">Enabled</option>
+                                    </select>
+                                    <div class="form-text">Removes duplicate data blocks to save space</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="auto_snapshot" name="auto_snapshot" checked>
+                                        <label class="form-check-label" for="auto_snapshot">
+                                            Enable Automatic Snapshots
+                                        </label>
+                                    </div>
+                                    <div class="form-text">Create periodic snapshots for data protection</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="read_only" name="read_only">
+                                        <label class="form-check-label" for="read_only">
+                                            Read-Only Dataset
+                                        </label>
+                                    </div>
+                                    <div class="form-text">Prevent writes to this dataset</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('storage.datasets') }}" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-folder-plus"></i> Create Dataset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- Dataset Info -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">What are Datasets?</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">
+                        Datasets are logical storage units within storage pools that help organize your data.
+                    </p>
+                    <ul class="small text-muted">
+                        <li><strong>Isolation:</strong> Each dataset can have its own quotas and settings</li>
+                        <li><strong>Snapshots:</strong> Point-in-time copies for data protection</li>
+                        <li><strong>Compression:</strong> Save space with built-in compression</li>
+                        <li><strong>Deduplication:</strong> Eliminate duplicate data blocks</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Pool Information -->
+            <div class="card shadow" id="pool_info_card" style="display: none;">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Selected Pool Info</h6>
+                </div>
+                <div class="card-body" id="pool_info_content">
+                    <!-- Pool info will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Pool information data
+const poolData = {
+    {% for pool in pools %}
+    {{ pool.id }}: {
+        name: "{{ pool.name }}",
+        raid_level: "{{ pool.raid_level.upper() }}",
+        filesystem: "{{ pool.filesystem_type }}",
+        mount_point: "{{ pool.mount_point or 'N/A' }}",
+        total_size: {{ pool.total_size or 0 }},
+        used_size: {{ pool.used_size or 0 }},
+        device_count: {{ pool.devices.count() }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        const forms = document.getElementsByClassName('needs-validation');
+        Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+
+// Update path preview
+function updatePathPreview() {
+    const poolSelect = document.getElementById('pool_id');
+    const nameInput = document.getElementById('name');
+    const previewPath = document.getElementById('preview_path');
+    
+    if (poolSelect.value && nameInput.value) {
+        const pool = poolData[poolSelect.value];
+        if (pool) {
+            previewPath.innerHTML = `<code>${pool.mount_point}/${nameInput.value}</code>`;
+        }
+    } else {
+        previewPath.innerHTML = '<span class="text-muted">Select pool and enter name to see path</span>';
+    }
+}
+
+// Update pool information display
+function updatePoolInfo() {
+    const poolSelect = document.getElementById('pool_id');
+    const poolInfoCard = document.getElementById('pool_info_card');
+    const poolInfoContent = document.getElementById('pool_info_content');
+    
+    if (poolSelect.value) {
+        const pool = poolData[poolSelect.value];
+        if (pool) {
+            const usedPercent = pool.total_size > 0 ? (pool.used_size / pool.total_size * 100) : 0;
+            const availableSize = pool.total_size - pool.used_size;
+            
+            poolInfoContent.innerHTML = `
+                <div class="mb-2">
+                    <strong>Pool:</strong> ${pool.name}
+                </div>
+                <div class="mb-2">
+                    <strong>RAID Level:</strong> <span class="badge bg-info">${pool.raid_level}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>Filesystem:</strong> <code>${pool.filesystem}</code>
+                </div>
+                <div class="mb-2">
+                    <strong>Mount Point:</strong><br>
+                    <small class="text-muted"><code>${pool.mount_point}</code></small>
+                </div>
+                <div class="mb-2">
+                    <strong>Devices:</strong> ${pool.device_count}
+                </div>
+                <hr>
+                <div class="mb-2">
+                    <strong>Total Size:</strong> ${(pool.total_size / Math.pow(1024, 3)).toFixed(1)} GB
+                </div>
+                <div class="mb-2">
+                    <strong>Used:</strong> ${(pool.used_size / Math.pow(1024, 3)).toFixed(1)} GB
+                </div>
+                <div class="mb-2">
+                    <strong>Available:</strong> ${(availableSize / Math.pow(1024, 3)).toFixed(1)} GB
+                </div>
+                <div class="progress mt-2">
+                    <div class="progress-bar bg-${usedPercent > 90 ? 'danger' : usedPercent > 75 ? 'warning' : 'success'}" 
+                         style="width: ${usedPercent}%"></div>
+                </div>
+                <small class="text-muted">${usedPercent.toFixed(1)}% used</small>
+            `;
+            poolInfoCard.style.display = 'block';
+        }
+    } else {
+        poolInfoCard.style.display = 'none';
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const poolSelect = document.getElementById('pool_id');
+    const nameInput = document.getElementById('name');
+    
+    poolSelect.addEventListener('change', function() {
+        updatePathPreview();
+        updatePoolInfo();
+    });
+    
+    nameInput.addEventListener('input', updatePathPreview);
+    
+    // Initial update if pool is pre-selected
+    if (poolSelect.value) {
+        updatePathPreview();
+        updatePoolInfo();
+    }
+});
+</script>
+{% endblock %}

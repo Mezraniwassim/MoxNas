@@ -81,7 +81,7 @@ class User(UserMixin, db.Model):
     
     # Relationships
     created_by = db.relationship('User', remote_side=[id], backref='created_users')
-    shares = db.relationship('Share', backref='owner', lazy='dynamic')
+    shares = db.relationship('Share', backref='owner', lazy='dynamic', foreign_keys='Share.owner_id')
     backup_jobs = db.relationship('BackupJob', backref='created_by_user', lazy='dynamic')
     
     def set_password(self, password):

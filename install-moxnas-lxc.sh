@@ -48,6 +48,8 @@ MEMORY=${MEMORY:-4096}
 DISK_SIZE=${DISK_SIZE:-20}
 NETWORK=${NETWORK:-"vmbr0"}
 IP_CONFIG=${IP_CONFIG:-"dhcp"}
+GITHUB_REPO=${GITHUB_REPO:-"https://github.com/Mezraniwassim/MoxNAS.git"}
+BRANCH=${BRANCH:-"master"}
 
 # Check if template exists
 msg_info "Checking Debian template"
@@ -189,13 +191,40 @@ EOF
 chmod 600 /opt/moxnas/.env
 chown moxnas:moxnas /opt/moxnas/.env
 
+msg_info "Setting up storage directories"
+mkdir -p /mnt/storage /mnt/backups /var/log/moxnas
+chown -R moxnas:moxnas /mnt/storage /mnt/backups /var/log/moxnas
+
 msg_info "Initializing database"
 cd /opt/moxnas
-sudo -u moxnas bash -c "source venv/bin/activate && python migrate.py init"
+sudo -u moxnas bash -c "source venv/bin/activate && python -c 'from app import create_app, db; app = create_app(\"production\"); app.app_context().push(); db.create_all()'"
 
 # Create admin user
 ADMIN_PASSWORD=$(openssl rand -base64 16)
-sudo -u moxnas bash -c "source venv/bin/activate && python migrate.py create-admin --username admin --email admin@moxnas.local --password '$ADMIN_PASSWORD' --first-name Admin --last-name User"
+sudo -u moxnas bash -c "source venv/bin/activate && python -c '
+from app import create_app, db
+from app.models import User, UserRole
+from werkzeug.security import generate_password_hash
+import os
+app = create_app(\"production\")
+with app.app_context():
+    admin = User(
+        username=\"admin\",
+        email=\"admin@moxnas.local\",
+        role=UserRole.ADMIN,
+        is_active=True,
+        password_hash=generate_password_hash(\"'$ADMIN_PASSWORD'\")
+    )
+    db.session.add(admin)
+    db.session.commit()
+    print(\"Admin user created successfully\")
+'"
+
+# Save admin credentials
+echo "Admin Username: admin" > /opt/moxnas/.admin_credentials
+echo "Admin Password: $ADMIN_PASSWORD" >> /opt/moxnas/.admin_credentials
+chmod 600 /opt/moxnas/.admin_credentials
+chown moxnas:moxnas /opt/moxnas/.admin_credentials
 
 msg_info "Configuring Nginx"
 # Generate self-signed SSL certificate
@@ -255,39 +284,120 @@ nginx -t
 systemctl restart nginx
 systemctl enable nginx
 
-msg_info "Configuring services"
-cat > /etc/supervisor/conf.d/moxnas.conf << 'EOF'
-[program:moxnas-web]
-command=/opt/moxnas/venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 wsgi:app
-directory=/opt/moxnas
-user=moxnas
-autostart=true
-autorestart=true
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/moxnas-web.log
+msg_info "Configuring systemd services"
+# Create MoxNAS systemd service
+cat > /etc/systemd/system/moxnas.service << 'EOF'
+[Unit]
+Description=MoxNAS Web Application
+Documentation=https://github.com/Mezraniwassim/MoxNAS
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
 
-[program:moxnas-worker]
-command=/opt/moxnas/venv/bin/celery -A celery_worker.celery worker --loglevel=info
-directory=/opt/moxnas
-user=moxnas
-autostart=true
-autorestart=true
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/moxnas-worker.log
+[Service]
+Type=exec
+User=moxnas
+Group=moxnas
+WorkingDirectory=/opt/moxnas
+Environment="PATH=/opt/moxnas/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/moxnas"
+EnvironmentFile=/opt/moxnas/.env
 
-[program:moxnas-beat]
-command=/opt/moxnas/venv/bin/celery -A celery_worker.celery beat --loglevel=info
-directory=/opt/moxnas
-user=moxnas
-autostart=true
-autorestart=true
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/moxnas-beat.log
+ExecStart=/opt/moxnas/venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 --timeout 120 wsgi:app
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+Restart=always
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security settings for LXC
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
+PrivateTmp=yes
+PrivateDevices=no
+ProtectKernelTunables=no
+ProtectKernelModules=no
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=1G
+CPUQuota=100%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moxnas
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
-supervisorctl reread
-supervisorctl update
-supervisorctl start moxnas-web moxnas-worker moxnas-beat
+# Create MoxNAS worker service
+cat > /etc/systemd/system/moxnas-worker.service << 'EOF'
+[Unit]
+Description=MoxNAS Background Worker
+After=network-online.target postgresql.service redis-server.service moxnas.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=exec
+User=moxnas
+Group=moxnas
+WorkingDirectory=/opt/moxnas
+Environment="PATH=/opt/moxnas/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/moxnas"
+EnvironmentFile=/opt/moxnas/.env
+
+ExecStart=/opt/moxnas/venv/bin/celery -A celery_worker.celery worker --loglevel=info --concurrency=2
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+Restart=always
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
+PrivateTmp=yes
+PrivateDevices=no
+ProtectKernelTunables=no
+ProtectKernelModules=no
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=2048
+MemoryMax=512M
+CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moxnas-worker
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd and start services
+systemctl daemon-reload
+systemctl enable moxnas moxnas-worker
+systemctl start moxnas moxnas-worker
 
 msg_info "Setting up storage and shares"
 mkdir -p /mnt/storage /mnt/backups /srv/ftp

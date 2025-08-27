@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Create Backup Job - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Create Backup Job</h1>
+        <a href="{{ url_for('backups.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Backups
+        </a>
+    </div>
+
+    <!-- Create Backup Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Backup Job Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('backups.create') }}" class="needs-validation" novalidate>
+                        <!-- Basic Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2">Basic Information</h6>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Job Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                                <div class="invalid-feedback">
+                                    Please provide a unique job name.
+                                </div>
+                                <div class="form-text">Unique identifier for this backup job</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="backup_type" class="form-label">Backup Type</label>
+                                <select class="form-select" id="backup_type" name="backup_type">
+                                    {% for backup_type in backup_types %}
+                                    <option value="{{ backup_type }}">{{ backup_type.title() }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">Type of backup to perform</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Source and Destination -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2">Source and Destination</h6>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="source_path" class="form-label">Source Path *</label>
+                                <input type="text" class="form-control" id="source_path" name="source_path" required>
+                                <div class="invalid-feedback">
+                                    Please provide a valid source path.
+                                </div>
+                                <div class="form-text">Directory or dataset to backup</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="destination_path" class="form-label">Destination Path *</label>
+                                <input type="text" class="form-control" id="destination_path" name="destination_path" required>
+                                <div class="invalid-feedback">
+                                    Please provide a destination path.
+                                </div>
+                                <div class="form-text">Where to store the backup</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Schedule -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2">Schedule</h6>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="schedule" class="form-label">Schedule Expression</label>
+                                <select class="form-select" id="schedule_preset" onchange="updateSchedule()">
+                                    <option value="">Custom...</option>
+                                    <option value="0 2 * * *">Daily at 2:00 AM</option>
+                                    <option value="0 2 * * 0">Weekly (Sunday at 2:00 AM)</option>
+                                    <option value="0 2 1 * *">Monthly (1st at 2:00 AM)</option>
+                                </select>
+                                <input type="text" class="form-control mt-2" id="schedule" name="schedule" 
+                                       placeholder="0 2 * * * (cron format)">
+                                <div class="form-text">Leave empty for manual backups only</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="retention_days" class="form-label">Retention (Days)</label>
+                                <input type="number" class="form-control" id="retention_days" 
+                                       name="retention_days" value="30" min="1" max="365">
+                                <div class="form-text">How long to keep backup files</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Options -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2">Options</h6>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="compression" name="compression">
+                                    <label class="form-check-label" for="compression">
+                                        Enable Compression
+                                    </label>
+                                </div>
+                                <div class="form-text">Compress backup files to save space</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="encryption" name="encryption">
+                                    <label class="form-check-label" for="encryption">
+                                        Enable Encryption
+                                    </label>
+                                </div>
+                                <div class="form-text">Encrypt backup files for security</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="{{ url_for('backups.index') }}" class="btn btn-secondary me-md-2">
+                                        Cancel
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-plus-circle"></i> Create Backup Job
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Help Panel -->
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Backup Types</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Full Backup:</strong>
+                        <p class="small text-muted mb-2">Complete copy of all files. Takes more time and space but fastest to restore.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Incremental:</strong>
+                        <p class="small text-muted mb-2">Only backs up files changed since the last backup. Faster and uses less space.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Differential:</strong>
+                        <p class="small text-muted mb-2">Backs up files changed since the last full backup. Balance between speed and restore time.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow mt-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">Schedule Examples</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <code>0 2 * * *</code> - Every day at 2:00 AM
+                    </div>
+                    <div class="mb-2">
+                        <code>0 2 * * 0</code> - Every Sunday at 2:00 AM
+                    </div>
+                    <div class="mb-2">
+                        <code>0 2 1 * *</code> - 1st of each month at 2:00 AM
+                    </div>
+                    <div class="mb-2">
+                        <code>0 */6 * * *</code> - Every 6 hours
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateSchedule() {
+    const preset = document.getElementById('schedule_preset').value;
+    document.getElementById('schedule').value = preset;
+}
+
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        const forms = document.getElementsByClassName('needs-validation');
+        Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+
+// Path suggestions
+document.getElementById('source_path').addEventListener('focus', function() {
+    // Could add autocomplete for available datasets/paths here
+});
+</script>
+{% endblock %}

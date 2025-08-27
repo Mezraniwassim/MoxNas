@@ -3,7 +3,7 @@ from flask import request, jsonify, current_app
 from flask_login import login_required, current_user
 from app.api import bp
 from app.models import (User, StorageDevice, StoragePool, Dataset, Share, BackupJob,
-                       SystemLog, LogLevel, UserRole, DeviceStatus, PoolStatus, ShareStatus)
+                       SystemLog, Alert, LogLevel, UserRole, DeviceStatus, PoolStatus, ShareStatus)
 from app import db, limiter
 from app.storage.manager import storage_manager
 from datetime import datetime

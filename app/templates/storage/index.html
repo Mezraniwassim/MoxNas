@@ -269,7 +269,7 @@
 <script>
 // Auto-refresh storage status every 30 seconds
 setInterval(function() {
-    fetch('{{ url_for("storage.api_storage_overview") }}')
+    fetch('{{ url_for("main.storage_overview_api") }}')
         .then(response => response.json())
         .then(data => {
             // Update storage overview cards if needed

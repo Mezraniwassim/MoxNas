@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Storage Pools - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Storage Pools</h1>
+        <div>
+            <a href="{{ url_for('storage.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Storage
+            </a>
+            <a href="{{ url_for('storage.create_pool') }}" class="btn btn-primary">
+                <i class="bi bi-plus"></i> Create Pool
+            </a>
+        </div>
+    </div>
+
+    <!-- Storage Pools List -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Storage Pools</h6>
+        </div>
+        <div class="card-body">
+            {% if pools.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Pool Name</th>
+                                <th>RAID Level</th>
+                                <th>Filesystem</th>
+                                <th>Status</th>
+                                <th>Size</th>
+                                <th>Usage</th>
+                                <th>Devices</th>
+                                <th>Mount Point</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pool in pools.items %}
+                            <tr>
+                                <td>
+                                    <strong>{{ pool.name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ pool.raid_level.upper() }}</span>
+                                </td>
+                                <td>
+                                    <code>{{ pool.filesystem_type }}</code>
+                                </td>
+                                <td>
+                                    {% set status = pool.status.value if pool.status else 'unknown' %}
+                                    <span class="badge bg-{{ 'success' if status == 'healthy' else 'warning' if status == 'degraded' else 'info' if status == 'scrubbing' else 'danger' }}">
+                                        {{ status.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if pool.total_size %}
+                                        {{ "%.1f"|format(pool.total_size / 1024**3) }} GB
+                                    {% else %}
+                                        <span class="text-muted">Unknown</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if pool.total_size and pool.used_size %}
+                                        {% set usage_percent = (pool.used_size / pool.total_size * 100) %}
+                                        <div class="progress" style="width: 100px;">
+                                            <div class="progress-bar bg-{{ 'danger' if usage_percent > 90 else 'warning' if usage_percent > 75 else 'success' }}" 
+                                                 style="width: {{ usage_percent }}%"></div>
+                                        </div>
+                                        <small>{{ "%.1f"|format(usage_percent) }}%</small>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ pool.devices.count() }} devices</span>
+                                </td>
+                                <td>
+                                    <code>{{ pool.mount_point or 'N/A' }}</code>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('storage.pool_detail', pool_id=pool.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if pool.status and pool.status.value != 'scrubbing' %}
+                                        <button type="button" class="btn btn-sm btn-outline-warning" 
+                                                onclick="startScrub({{ pool.id }})">
+                                            <i class="bi bi-tools"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="deletePool({{ pool.id }}, '{{ pool.name }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if pools.pages > 1 %}
+                <nav aria-label="Pool pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if pools.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('storage.pools', page=pools.prev_num) }}">Previous</a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in pools.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != pools.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('storage.pools', page=page_num) }}">{{ page_num }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if pools.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('storage.pools', page=pools.next_num) }}">Next</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-hdd-stack display-1 text-muted"></i>
+                    <h4 class="mt-3 text-muted">No Storage Pools</h4>
+                    <p class="text-muted">Create your first storage pool to get started.</p>
+                    <a href="{{ url_for('storage.create_pool') }}" class="btn btn-primary">
+                        <i class="bi bi-plus"></i> Create Storage Pool
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function startScrub(poolId) {
+    if (confirm('Are you sure you want to start a scrub? This process may take several hours.')) {
+        fetch(`/storage/pools/${poolId}/scrub`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error starting scrub: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to start scrub');
+        });
+    }
+}
+
+function deletePool(poolId, poolName) {
+    if (confirm(`Are you sure you want to delete pool "${poolName}"? This will permanently destroy all data in this pool and cannot be undone.`)) {
+        if (confirm('This action is IRREVERSIBLE. Type the pool name to confirm: ' + poolName)) {
+            fetch(`/storage/pools/${poolId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error deleting pool: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to delete pool');
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

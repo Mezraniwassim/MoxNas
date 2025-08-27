@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Service Unavailable{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="error-template">
+                <h1 class="display-1">503</h1>
+                <h2 class="mb-3">Service Temporarily Unavailable</h2>
+                <div class="error-details mb-4">
+                    <p class="lead">The server is temporarily unable to service your request due to maintenance downtime or capacity problems.</p>
+                    <p class="text-muted">Please try again shortly.</p>
+                </div>
+                <div class="error-actions">
+                    <a href="javascript:location.reload()" class="btn btn-primary">
+                        <i class="bi bi-arrow-clockwise"></i> Retry
+                    </a>
+                    <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+                        <i class="bi bi-house"></i> Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

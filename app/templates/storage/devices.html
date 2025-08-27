@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Storage Devices - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Storage Devices</h1>
+        <div>
+            <a href="{{ url_for('storage.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Storage
+            </a>
+            <button class="btn btn-primary" onclick="scanDevices()">
+                <i class="bi bi-search"></i> Scan Devices
+            </button>
+        </div>
+    </div>
+
+    <!-- Device List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Available Storage Devices</h6>
+                </div>
+                <div class="card-body">
+                    {% if devices.items %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Device</th>
+                                        <th>Model</th>
+                                        <th>Serial</th>
+                                        <th>Size</th>
+                                        <th>Status</th>
+                                        <th>Pool</th>
+                                        <th>Temperature</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for device in devices.items %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ device.device_path }}</strong><br>
+                                            <small class="text-muted">{{ device.device_name }}</small>
+                                        </td>
+                                        <td>{{ device.device_model or 'Unknown' }}</td>
+                                        <td>
+                                            <small class="font-monospace">{{ device.device_serial or 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            {% if device.device_size %}
+                                                {{ "%.1f"|format(device.device_size / 1024**3) }} GB
+                                            {% else %}
+                                                Unknown
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set status = device.status.value if device.status else 'unknown' %}
+                                            <span class="badge bg-{{ 'success' if status == 'healthy' else 'warning' if status == 'warning' else 'danger' }}">
+                                                {{ status.title() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if device.pool %}
+                                                <a href="{{ url_for('storage.pool_detail', pool_id=device.pool.id) }}">
+                                                    {{ device.pool.name }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">Unassigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if device.temperature %}
+                                                {{ device.temperature }}°C
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                                        onclick="showDeviceDetails({{ device.id }})">
+                                                    <i class="bi bi-info-circle"></i>
+                                                </button>
+                                                {% if not device.pool %}
+                                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                                        onclick="assignToPool({{ device.id }})">
+                                                    <i class="bi bi-plus"></i> Assign
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if devices.pages > 1 %}
+                        <nav aria-label="Device pagination">
+                            <ul class="pagination justify-content-center">
+                                {% if devices.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('storage.devices', page=devices.prev_num) }}">Previous</a>
+                                </li>
+                                {% endif %}
+                                
+                                {% for page_num in devices.iter_pages() %}
+                                    {% if page_num %}
+                                        {% if page_num != devices.page %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('storage.devices', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                        {% else %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                        {% endif %}
+                                    {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if devices.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('storage.devices', page=devices.next_num) }}">Next</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-device-hdd display-1 text-muted"></i>
+                            <h4 class="mt-3 text-muted">No storage devices found</h4>
+                            <p class="text-muted">Click "Scan Devices" to detect available storage devices.</p>
+                            <button class="btn btn-primary" onclick="scanDevices()">
+                                <i class="bi bi-search"></i> Scan for Devices
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Device Details Modal -->
+<div class="modal fade" id="deviceDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Device Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="deviceDetailsContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function scanDevices() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass"></i> Scanning...';
+    
+    fetch('{{ url_for("storage.scan_devices") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to scan devices');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+function showDeviceDetails(deviceId) {
+    const modal = new bootstrap.Modal(document.getElementById('deviceDetailsModal'));
+    
+    fetch(`/api/storage/devices/${deviceId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const device = data.device;
+            document.getElementById('deviceDetailsContent').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Path:</strong></td><td>${device.device_path}</td></tr>
+                            <tr><td><strong>Name:</strong></td><td>${device.device_name}</td></tr>
+                            <tr><td><strong>Model:</strong></td><td>${device.device_model || 'Unknown'}</td></tr>
+                            <tr><td><strong>Serial:</strong></td><td>${device.device_serial || 'N/A'}</td></tr>
+                            <tr><td><strong>Size:</strong></td><td>${device.device_size ? (device.device_size / Math.pow(1024, 3)).toFixed(1) + ' GB' : 'Unknown'}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Health Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${device.status === 'healthy' ? 'success' : 'warning'}">${device.status ? device.status.charAt(0).toUpperCase() + device.status.slice(1) : 'Unknown'}</span></td></tr>
+                            <tr><td><strong>Temperature:</strong></td><td>${device.temperature ? device.temperature + '°C' : 'N/A'}</td></tr>
+                            <tr><td><strong>Power On Hours:</strong></td><td>${device.power_on_hours || 'N/A'}</td></tr>
+                            <tr><td><strong>Pool:</strong></td><td>${device.pool ? device.pool.name : 'Unassigned'}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else {
+            document.getElementById('deviceDetailsContent').innerHTML = `
+                <div class="alert alert-danger">
+                    Error loading device details: ${data.error}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        document.getElementById('deviceDetailsContent').innerHTML = `
+            <div class="alert alert-danger">
+                Failed to load device details.
+            </div>
+        `;
+    });
+    
+    modal.show();
+}
+
+function assignToPool(deviceId) {
+    // This would open a modal to assign device to a pool
+    alert('Pool assignment feature coming soon!');
+}
+</script>
+{% endblock %}

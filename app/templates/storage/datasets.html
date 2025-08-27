@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Datasets - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Datasets</h1>
+        <div>
+            <a href="{{ url_for('storage.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Storage
+            </a>
+            <a href="{{ url_for('storage.create_dataset') }}" class="btn btn-primary">
+                <i class="bi bi-plus"></i> Create Dataset
+            </a>
+        </div>
+    </div>
+
+    <!-- Datasets List -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">All Datasets</h6>
+        </div>
+        <div class="card-body">
+            {% if datasets.items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Dataset Name</th>
+                                <th>Storage Pool</th>
+                                <th>Path</th>
+                                <th>Quota</th>
+                                <th>Used Space</th>
+                                <th>Usage</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dataset in datasets.items %}
+                            <tr>
+                                <td>
+                                    <strong>{{ dataset.name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ dataset.pool.name }}</span>
+                                </td>
+                                <td>
+                                    <code>{{ dataset.path }}</code>
+                                </td>
+                                <td>
+                                    {% if dataset.quota_size %}
+                                        {{ "%.1f"|format(dataset.quota_size / 1024**3) }} GB
+                                    {% else %}
+                                        <span class="text-muted">Unlimited</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if dataset.used_size %}
+                                        {{ "%.1f"|format(dataset.used_size / 1024**3) }} GB
+                                    {% else %}
+                                        0 GB
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if dataset.quota_size and dataset.used_size %}
+                                        {% set usage_percent = (dataset.used_size / dataset.quota_size * 100) %}
+                                        <div class="progress" style="width: 100px;">
+                                            <div class="progress-bar bg-{{ 'danger' if usage_percent > 90 else 'warning' if usage_percent > 75 else 'success' }}" 
+                                                 style="width: {{ usage_percent }}%"></div>
+                                        </div>
+                                        <small>{{ "%.1f"|format(usage_percent) }}%</small>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ dataset.created_at.strftime('%Y-%m-%d') if dataset.created_at else 'Unknown' }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                onclick="editDataset({{ dataset.id }})">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                                onclick="browseDataset('{{ dataset.path }}')">
+                                            <i class="bi bi-folder"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteDataset({{ dataset.id }}, '{{ dataset.name }}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if datasets.pages > 1 %}
+                <nav aria-label="Dataset pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if datasets.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('storage.datasets', page=datasets.prev_num) }}">Previous</a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in datasets.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != datasets.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('storage.datasets', page=page_num) }}">{{ page_num }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if datasets.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('storage.datasets', page=datasets.next_num) }}">Next</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-folder display-1 text-muted"></i>
+                    <h4 class="mt-3 text-muted">No Datasets</h4>
+                    <p class="text-muted">Create datasets to organize your storage pools.</p>
+                    <a href="{{ url_for('storage.create_dataset') }}" class="btn btn-primary">
+                        <i class="bi bi-plus"></i> Create Dataset
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Dataset Statistics -->
+    {% if datasets.items %}
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Datasets
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ datasets.total }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-folder text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Total Used Space
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% set total_used = datasets.items|sum(attribute='used_size') or 0 %}
+                                {{ "%.1f"|format(total_used / 1024**3) }} GB
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hdd text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                With Quota
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% set quota_count = datasets.items|selectattr('quota_size')|list|length %}
+                                {{ quota_count }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-speedometer text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Storage Pools
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% set pool_count = datasets.items|map(attribute='pool')|unique|list|length %}
+                                {{ pool_count }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hdd-stack text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editDataset(datasetId) {
+    window.location.href = `/storage/datasets/${datasetId}/edit`;
+}
+
+function browseDataset(path) {
+    // Open file browser for dataset path
+    window.open(`/storage/browse?path=${encodeURIComponent(path)}`, '_blank');
+}
+
+function deleteDataset(datasetId, datasetName) {
+    if (confirm(`Are you sure you want to delete dataset "${datasetName}"? This will permanently delete all data in this dataset and cannot be undone.`)) {
+        fetch(`/storage/datasets/${datasetId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting dataset: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete dataset');
+        });
+    }
+}
+</script>
+{% endblock %}

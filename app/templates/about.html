@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}About MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">About MoxNAS</h1>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- About MoxNAS -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-hdd-stack"></i> MoxNAS - Professional Network Attached Storage
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-hdd-stack display-1 text-primary"></i>
+                        <h2 class="mt-3">MoxNAS v1.0.0</h2>
+                        <p class="lead text-muted">Professional Network Attached Storage Solution</p>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5><i class="bi bi-check-circle text-success"></i> Key Features</h5>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-arrow-right text-primary"></i> RAID Storage Management</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Multi-Protocol File Sharing (SMB, NFS, FTP)</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Automated Backup Solutions</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Real-time System Monitoring</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> User Access Control</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> SMART Drive Health Monitoring</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Web-based Administration</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Alert Management System</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5><i class="bi bi-shield-check text-success"></i> Security Features</h5>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-arrow-right text-primary"></i> Two-Factor Authentication</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Role-based Access Control</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Comprehensive Audit Logging</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Account Lockout Protection</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Encrypted Data Storage</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Secure Remote Access</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Network Access Controls</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Data Integrity Verification</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5><i class="bi bi-diagram-3 text-info"></i> Supported Protocols</h5>
+                            <div class="row">
+                                <div class="col-sm-4 text-center mb-3">
+                                    <i class="bi bi-windows display-4 text-primary"></i>
+                                    <h6 class="mt-2">SMB/CIFS</h6>
+                                    <small class="text-muted">Windows File Sharing</small>
+                                </div>
+                                <div class="col-sm-4 text-center mb-3">
+                                    <i class="bi bi-server display-4 text-success"></i>
+                                    <h6 class="mt-2">NFS</h6>
+                                    <small class="text-muted">Network File System</small>
+                                </div>
+                                <div class="col-sm-4 text-center mb-3">
+                                    <i class="bi bi-cloud-upload display-4 text-info"></i>
+                                    <h6 class="mt-2">FTP/SFTP</h6>
+                                    <small class="text-muted">File Transfer Protocol</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5><i class="bi bi-hdd text-warning"></i> Supported RAID Levels</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-borderless">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>RAID 0:</strong></td>
+                                            <td>Striping (Performance)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>RAID 1:</strong></td>
+                                            <td>Mirroring (Redundancy)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>RAID 5:</strong></td>
+                                            <td>Striping with Parity</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>RAID 10:</strong></td>
+                                            <td>Striped Mirrors</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- System Information -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">System Information</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Version:</strong></td>
+                            <td>1.0.0</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Build:</strong></td>
+                            <td>{{ moment().format('YYYY.MM.DD') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Platform:</strong></td>
+                            <td>Linux x86_64</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Python:</strong></td>
+                            <td>3.8+</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Framework:</strong></td>
+                            <td>Flask</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Database:</strong></td>
+                            <td>SQLite / PostgreSQL</td>
+                        </tr>
+                    </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- License Information -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">License Information</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        MoxNAS is distributed under the MIT License. This software is provided "as is" without warranty of any kind.
+                    </p>
+                    
+                    <div class="mt-3">
+                        <h6>Third-Party Components:</h6>
+                        <ul class="list-unstyled small">
+                            <li>• Flask Web Framework</li>
+                            <li>• Bootstrap UI Framework</li>
+                            <li>• Chart.js for Visualizations</li>
+                            <li>• Bootstrap Icons</li>
+                            <li>• PSUtil for System Monitoring</li>
+                            <li>• SQLAlchemy ORM</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Support Information -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">Support & Documentation</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('main.help') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-question-circle"></i> User Manual
+                        </a>
+                        <a href="/docs" class="btn btn-outline-info btn-sm">
+                            <i class="bi bi-book"></i> Documentation
+                        </a>
+                        <a href="https://github.com/moxnas/moxnas" class="btn btn-outline-secondary btn-sm" target="_blank">
+                            <i class="bi bi-github"></i> GitHub Repository
+                        </a>
+                        <a href="mailto:support@moxnas.com" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-envelope"></i> Contact Support
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Credits and Acknowledgments -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-secondary">Credits & Acknowledgments</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Development Team</h6>
+                            <p class="text-muted small">
+                                MoxNAS is developed by a team of experienced systems engineers and software developers 
+                                with extensive experience in enterprise storage solutions and network-attached storage systems.
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Special Thanks</h6>
+                            <p class="text-muted small">
+                                Special thanks to the open-source community and all the contributors who have made 
+                                this project possible through their libraries, tools, and frameworks.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-heart-fill text-danger"></i> 
+                            Built with passion for reliable, secure, and efficient data storage solutions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add some interactive elements
+document.addEventListener('DOMContentLoaded', function() {
+    // Add tooltips to feature items
+    const tooltips = {
+        'RAID Storage Management': 'Create and manage RAID arrays for data protection and performance',
+        'Multi-Protocol File Sharing': 'Share files using SMB, NFS, and FTP protocols',
+        'Automated Backup Solutions': 'Schedule and manage automated backup jobs',
+        'Real-time System Monitoring': 'Monitor system performance and health in real-time',
+        'Two-Factor Authentication': 'Enhanced security with TOTP-based 2FA',
+        'Role-based Access Control': 'Manage user permissions with granular role controls'
+    };
+    
+    // You could add more interactive features here
+    console.log('MoxNAS About page loaded successfully');
+});
+</script>
+{% endblock %}

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Create Storage Pool - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Create Storage Pool</h1>
+        <a href="{{ url_for('storage.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Storage
+        </a>
+    </div>
+
+    <!-- Create Pool Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Pool Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('storage.create_pool') }}">
+                        <!-- Pool Name -->
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Pool Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                            <div class="form-text">Choose a unique name for this storage pool</div>
+                        </div>
+
+                        <!-- Pool Type -->
+                        <div class="mb-3">
+                            <label for="raid_level" class="form-label">Pool Type</label>
+                            <select class="form-select" id="raid_level" name="raid_level" required>
+                                <option value="">Select pool type...</option>
+                                <option value="single">Single Disk</option>
+                                <option value="mirror">Mirror (RAID 1)</option>
+                                <option value="raidz1">RAID-Z1 (Single Parity)</option>
+                                <option value="raidz2">RAID-Z2 (Double Parity)</option>
+                                <option value="raidz3">RAID-Z3 (Triple Parity)</option>
+                                <option value="stripe">Stripe (RAID 0)</option>
+                            </select>
+                            <div class="form-text">Choose the redundancy level for your pool</div>
+                        </div>
+
+                        <!-- Available Devices -->
+                        <div class="mb-3">
+                            <label class="form-label">Available Devices</label>
+                            {% if available_devices %}
+                                <div class="row">
+                                    {% for device in available_devices %}
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   name="devices" value="{{ device.id }}" 
+                                                   id="device_{{ device.id }}">
+                                            <label class="form-check-label" for="device_{{ device.id }}">
+                                                <strong>{{ device.device_path }}</strong><br>
+                                                <small class="text-muted">
+                                                    {{ device.model or 'Unknown Model' }} - 
+                                                    {{ (device.size / 1024**3) | round(1) if device.size else 'Unknown' }} GB
+                                                    {% if device.status %}
+                                                        <span class="badge bg-{{ 'success' if device.status.value == 'healthy' else 'warning' }}">
+                                                            {{ device.status.value.title() }}
+                                                        </span>
+                                                    {% endif %}
+                                                </small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    No available devices found. All devices are already assigned to pools.
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Filesystem -->
+                        <div class="mb-3">
+                            <label for="filesystem" class="form-label">Filesystem</label>
+                            <select class="form-select" id="filesystem" name="filesystem" required>
+                                <option value="ext4">EXT4 (Recommended)</option>
+                                <option value="xfs">XFS</option>
+                                <option value="btrfs">Btrfs</option>
+                            </select>
+                            <div class="form-text">Choose the filesystem for your storage pool</div>
+                        </div>
+
+                        <!-- Advanced Options -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="compression" name="compression">
+                                <label class="form-check-label" for="compression">
+                                    Enable Compression
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="deduplication" name="deduplication">
+                                <label class="form-check-label" for="deduplication">
+                                    Enable Deduplication
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('storage.index') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary" {% if not available_devices %}disabled{% endif %}>
+                                <i class="bi bi-plus-circle"></i> Create Pool
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Panel -->
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Pool Type Guide</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Single Disk:</strong>
+                        <p class="small text-muted mb-2">No redundancy. Fastest performance but no fault tolerance.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Mirror (RAID 1):</strong>
+                        <p class="small text-muted mb-2">Data is duplicated across drives. Requires 2+ drives. Can lose 1 drive.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>RAID-Z1:</strong>
+                        <p class="small text-muted mb-2">Single parity. Requires 3+ drives. Can lose 1 drive.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>RAID-Z2:</strong>
+                        <p class="small text-muted mb-2">Double parity. Requires 4+ drives. Can lose 2 drives.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>RAID-Z3:</strong>
+                        <p class="small text-muted mb-2">Triple parity. Requires 5+ drives. Can lose 3 drives.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Stripe (RAID 0):</strong>
+                        <p class="small text-muted mb-2">Data striped across drives. Fastest, but no fault tolerance.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Pool type validation
+document.getElementById('pool_type').addEventListener('change', function() {
+    const poolType = this.value;
+    const deviceCheckboxes = document.querySelectorAll('input[name="devices"]');
+    const selectedDevices = Array.from(deviceCheckboxes).filter(cb => cb.checked);
+    
+    // Add validation logic based on pool type requirements
+    let minDevices = 1;
+    switch(poolType) {
+        case 'mirror':
+            minDevices = 2;
+            break;
+        case 'raidz1':
+            minDevices = 3;
+            break;
+        case 'raidz2':
+            minDevices = 4;
+            break;
+        case 'raidz3':
+            minDevices = 5;
+            break;
+    }
+    
+    // Update form validation dynamically
+    deviceCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            const selected = Array.from(deviceCheckboxes).filter(c => c.checked).length;
+            const submitBtn = document.querySelector('button[type="submit"]');
+            
+            if (selected >= minDevices) {
+                submitBtn.disabled = false;
+            } else {
+                submitBtn.disabled = true;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

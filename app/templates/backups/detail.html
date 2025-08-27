@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+
+{% block title %}Backup Job: {{ job.name }} - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Backup Job: {{ job.name }}</h1>
+        <div>
+            <a href="{{ url_for('backups.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Backups
+            </a>
+            {% if job.status.value != 'running' %}
+            <button class="btn btn-success" onclick="startBackup({{ job.id }}, '{{ job.name }}')">
+                <i class="bi bi-play"></i> Start Backup
+            </button>
+            {% else %}
+            <button class="btn btn-warning" onclick="stopBackup({{ job.id }}, '{{ job.name }}')">
+                <i class="bi bi-stop"></i> Stop Backup
+            </button>
+            {% endif %}
+            <button class="btn btn-danger" onclick="deleteBackup({{ job.id }}, '{{ job.name }}')">
+                <i class="bi bi-trash"></i> Delete Job
+            </button>
+        </div>
+    </div>
+
+    <!-- Job Overview -->
+    <div class="row">
+        <!-- Job Information -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Job Information</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Name:</strong></td>
+                            <td>{{ job.name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% set status = job.status.value if job.status else 'unknown' %}
+                                <span class="badge bg-{{ 'success' if status == 'completed' else 'info' if status == 'running' else 'warning' if status == 'scheduled' else 'danger' if status == 'failed' else 'secondary' }}">
+                                    {{ status.title() }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Backup Type:</strong></td>
+                            <td>
+                                <span class="badge bg-info">{{ job.backup_type.title() }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Source Path:</strong></td>
+                            <td><code>{{ job.source_path }}</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Destination:</strong></td>
+                            <td><code>{{ job.destination_path }}</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Schedule:</strong></td>
+                            <td>
+                                {% if job.schedule %}
+                                    <code>{{ job.schedule }}</code>
+                                {% else %}
+                                    <span class="text-muted">Manual only</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else 'Unknown' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created By:</strong></td>
+                            <td>{{ job.created_by.username if job.created_by else 'System' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job Status -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Job Status</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td><strong>Last Run:</strong></td>
+                            <td>
+                                {% if job.last_run %}
+                                    {{ job.last_run.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Next Run:</strong></td>
+                            <td>
+                                {% if job.next_run %}
+                                    {{ job.next_run.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% else %}
+                                    <span class="text-muted">Not scheduled</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Run Count:</strong></td>
+                            <td>{{ job.run_count or 0 }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Success Count:</strong></td>
+                            <td>{{ job.success_count or 0 }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Bytes Backed Up:</strong></td>
+                            <td>
+                                {% if job.bytes_backed_up %}
+                                    {{ "%.2f"|format(job.bytes_backed_up / 1024**3) }} GB
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Average Duration:</strong></td>
+                            <td>
+                                {% if job.average_duration %}
+                                    {{ job.average_duration }} minutes
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if job.error_message %}
+                        <tr>
+                            <td><strong>Last Error:</strong></td>
+                            <td>
+                                <div class="alert alert-danger py-1 px-2 mb-0">
+                                    <small>{{ job.error_message }}</small>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Settings -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Job Settings</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <strong>Compression:</strong><br>
+                                <span class="badge bg-{{ 'success' if job.compression else 'secondary' }}">
+                                    {{ 'Enabled' if job.compression else 'Disabled' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <strong>Encryption:</strong><br>
+                                <span class="badge bg-{{ 'success' if job.encryption else 'secondary' }}">
+                                    {{ 'Enabled' if job.encryption else 'Disabled' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <strong>Retention:</strong><br>
+                                <span class="badge bg-info">{{ job.retention_days or 30 }} days</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <strong>Notifications:</strong><br>
+                                <span class="badge bg-{{ 'success' if job.notifications else 'secondary' }}">
+                                    {{ 'Enabled' if job.notifications else 'Disabled' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Run Progress (if running) -->
+    {% if job.status and job.status.value == 'running' %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Backup in Progress</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Progress</span>
+                        <span id="progress-percent">{{ job.progress or 0 }}%</span>
+                    </div>
+                    <div class="progress mb-3">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" 
+                             style="width: {{ job.progress or 0 }}%" id="progress-bar"></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <small><strong>Files Processed:</strong> <span id="files-processed">{{ job.files_processed or 0 }}</span></small>
+                        </div>
+                        <div class="col-md-4">
+                            <small><strong>Data Transferred:</strong> <span id="data-transferred">
+                                {{ "%.2f"|format((job.bytes_transferred or 0) / 1024**2) }} MB
+                            </span></small>
+                        </div>
+                        <div class="col-md-4">
+                            <small><strong>Elapsed Time:</strong> <span id="elapsed-time">
+                                {% if job.last_run %}
+                                    {{ ((now() - job.last_run).total_seconds() / 60)|int }} minutes
+                                {% else %}
+                                    0 minutes
+                                {% endif %}
+                            </span></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Backup History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Backup History</h6>
+                </div>
+                <div class="card-body">
+                    {% if backup_history %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Size</th>
+                                        <th>Duration</th>
+                                        <th>Files</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for run in backup_history %}
+                                    <tr>
+                                        <td>{{ run.date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if run.status == 'completed' else 'danger' if run.status == 'failed' else 'warning' }}">
+                                                {{ run.status.title() }}
+                                            </span>
+                                        </td>
+                                        <td>{{ run.size or 'N/A' }}</td>
+                                        <td>{{ run.duration or 'N/A' }}</td>
+                                        <td>{{ run.files or 'N/A' }}</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                                        onclick="viewBackupLog('{{ loop.index }}')">
+                                                    <i class="bi bi-file-text"></i> Log
+                                                </button>
+                                                {% if run.status == 'completed' %}
+                                                <button type="button" class="btn btn-sm btn-outline-success" 
+                                                        onclick="restoreFromBackup('{{ loop.index }}')">
+                                                    <i class="bi bi-arrow-clockwise"></i> Restore
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-clock-history display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">No Backup History</h5>
+                            <p class="text-muted">This backup job has not run yet.</p>
+                            <button class="btn btn-primary" onclick="startBackup({{ job.id }}, '{{ job.name }}')">
+                                <i class="bi bi-play"></i> Run First Backup
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Statistics -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Runs
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ job.run_count or 0 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-play-circle text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Successful Runs
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ job.success_count or 0 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-check-circle text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Data Backed Up
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ "%.1f"|format((job.bytes_backed_up or 0) / 1024**3) }} GB
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hdd text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Success Rate
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {% if job.run_count and job.run_count > 0 %}
+                                    {{ "%.1f"|format((job.success_count or 0) / job.run_count * 100) }}%
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-graph-up text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function startBackup(jobId, jobName) {
+    if (confirm(`Are you sure you want to start backup job "${jobName}"?`)) {
+        fetch(`/backups/${jobId}/start`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error starting backup: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to start backup');
+        });
+    }
+}
+
+function stopBackup(jobId, jobName) {
+    if (confirm(`Are you sure you want to stop backup job "${jobName}"?`)) {
+        fetch(`/backups/${jobId}/stop`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error stopping backup: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to stop backup');
+        });
+    }
+}
+
+function deleteBackup(jobId, jobName) {
+    if (confirm(`Are you sure you want to delete backup job "${jobName}"? This cannot be undone.`)) {
+        fetch(`/backups/${jobId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/backups/';
+            } else {
+                alert('Error deleting backup: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete backup');
+        });
+    }
+}
+
+function viewBackupLog(runIndex) {
+    // Open backup log viewer
+    window.open(`/backups/logs/${runIndex}`, '_blank');
+}
+
+function restoreFromBackup(runIndex) {
+    // Open restore dialog
+    if (confirm('Are you sure you want to restore from this backup? This will overwrite existing files.')) {
+        window.location.href = `/backups/restore/${runIndex}`;
+    }
+}
+
+// Auto-refresh if backup is running
+{% if job.status and job.status.value == 'running' %}
+setInterval(function() {
+    // Refresh progress data
+    fetch(`/backups/api/job/{{ job.id }}/progress`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.progress !== undefined) {
+            document.getElementById('progress-percent').textContent = data.progress + '%';
+            document.getElementById('progress-bar').style.width = data.progress + '%';
+        }
+        if (data.files_processed !== undefined) {
+            document.getElementById('files-processed').textContent = data.files_processed;
+        }
+        if (data.data_transferred !== undefined) {
+            document.getElementById('data-transferred').textContent = 
+                (data.data_transferred / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+        if (data.status === 'completed' || data.status === 'failed') {
+            location.reload();
+        }
+    })
+    .catch(error => console.error('Error fetching progress:', error));
+}, 5000); // Update every 5 seconds
+{% endif %}
+</script>
+{% endblock %}

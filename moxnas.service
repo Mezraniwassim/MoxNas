@@ -25,18 +25,17 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
 
-# Security settings
+# Security settings (LXC compatible)
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 ReadWritePaths=/opt/moxnas /mnt/storage /mnt/backups /tmp /var/log
 PrivateTmp=yes
 PrivateDevices=no
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
+ProtectKernelTunables=no
+ProtectKernelModules=no
 ProtectControlGroups=yes
 RestrictRealtime=yes
-RestrictNamespaces=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=no
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

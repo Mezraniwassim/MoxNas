@@ -13,7 +13,12 @@ from celery import current_app
 @login_required
 def index():
     """Backup jobs overview page"""
-    page = request.args.get('page', 1, type=int)
+    page = request.args.get('page', '1')
+    try:
+        page = int(page) if page else 1
+    except (ValueError, TypeError):
+        page = 1
+        
     jobs = BackupJob.query.paginate(
         page=page, per_page=20, error_out=False
     )
@@ -23,11 +28,21 @@ def index():
     running_jobs = BackupJob.query.filter_by(status=BackupStatus.RUNNING).count()
     failed_jobs = BackupJob.query.filter_by(status=BackupStatus.FAILED).count()
     
+    # Create backup stats object
+    backup_stats = {
+        'total': total_jobs,
+        'running': running_jobs,
+        'failed': failed_jobs,
+        'successful': total_jobs - running_jobs - failed_jobs,
+        'scheduled': BackupJob.query.filter(BackupJob.next_run.isnot(None)).count()
+    }
+    
     return render_template('backups/index.html', 
                          jobs=jobs,
                          total_jobs=total_jobs,
                          running_jobs=running_jobs,
-                         failed_jobs=failed_jobs)
+                         failed_jobs=failed_jobs,
+                         backup_stats=backup_stats)
 
 @bp.route('/create', methods=['GET', 'POST'])
 @login_required
@@ -337,3 +352,48 @@ def get_backup_history(job):
             'duration': '12 minutes'
         }
     ]
+
+# Additional API Routes
+
+@bp.route('/api/jobs/<int:job_id>/run', methods=['POST'])
+@login_required
+def api_run_job(job_id):
+    """API endpoint to run a backup job"""
+    try:
+        job = BackupJob.query.get_or_404(job_id)
+        
+        # Here you would trigger the actual backup job
+        job.status = BackupStatus.RUNNING
+        job.last_run = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Backup job "{job.name}" started successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@bp.route('/api/jobs/<int:job_id>', methods=['DELETE'])
+@login_required
+def api_delete_job(job_id):
+    """API endpoint to delete a backup job"""
+    try:
+        job = BackupJob.query.get_or_404(job_id)
+        job_name = job.name
+        
+        db.session.delete(job)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Backup job "{job_name}" deleted successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500

@@ -38,7 +38,8 @@ def create():
         try:
             name = request.form.get('name', '').strip()
             protocol = ShareProtocol(request.form.get('protocol'))
-            dataset_id = int(request.form.get('dataset_id'))
+            dataset_id_str = request.form.get('dataset_id')
+            dataset_id = int(dataset_id_str) if dataset_id_str else None
             guest_access = request.form.get('guest_access') == 'on'
             read_only = request.form.get('read_only') == 'on'
             allowed_hosts = request.form.get('allowed_hosts', '').strip()
@@ -52,6 +53,10 @@ def create():
                 flash('Share name already exists', 'danger')
                 return redirect(url_for('shares.create'))
             
+            if not dataset_id:
+                flash('Dataset selection is required', 'danger')
+                return redirect(url_for('shares.create'))
+                
             dataset = Dataset.query.get(dataset_id)
             if not dataset:
                 flash('Invalid dataset selected', 'danger')

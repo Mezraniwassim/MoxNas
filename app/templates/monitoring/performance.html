@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+
+{% block title %}Performance Monitoring - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Performance Monitoring</h1>
+        <div>
+            <a href="{{ url_for('monitoring.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Monitoring
+            </a>
+            <button class="btn btn-primary" onclick="refreshMetrics()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Real-time System Metrics -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                CPU Usage
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="cpu-usage">0%</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-cpu text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Memory Usage
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="memory-usage">0%</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-memory text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Disk I/O
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="disk-io">0 MB/s</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hdd text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Network I/O
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="network-io">0 MB/s</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-ethernet text-gray-300" style="font-size: 2rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CPU Performance -->
+    <div class="row">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">CPU Performance</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">CPU Cores</h6>
+                </div>
+                <div class="card-body">
+                    <div id="cpu-cores">
+                        <!-- CPU core usage will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory and Disk Usage -->
+    <div class="row">
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Memory Usage</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                    <div class="mt-4 text-center small">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <span class="text-primary">Used</span>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-success">Buffers/Cache</span>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-info">Free</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Disk Usage</h6>
+                </div>
+                <div class="card-body">
+                    <div id="disk-partitions">
+                        <!-- Disk partition usage will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Traffic -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Network Traffic</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="networkChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Processes -->
+    <div class="row">
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top CPU Processes</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="top-cpu-processes">
+                            <thead>
+                                <tr>
+                                    <th>PID</th>
+                                    <th>Name</th>
+                                    <th>CPU %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top Memory Processes</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="top-memory-processes">
+                            <thead>
+                                <tr>
+                                    <th>PID</th>
+                                    <th>Name</th>
+                                    <th>Memory %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let cpuChart, memoryChart, networkChart;
+let metricsData = {
+    cpu: [],
+    memory: [],
+    network: { sent: [], recv: [] },
+    timestamps: []
+};
+
+// Initialize charts
+function initializeCharts() {
+    // CPU Chart
+    const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+    cpuChart = new Chart(cpuCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU Usage %',
+                data: [],
+                borderColor: '#4e73df',
+                backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Memory Chart (Pie)
+    const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+    memoryChart = new Chart(memoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Used', 'Buffers/Cache', 'Free'],
+            datasets: [{
+                data: [0, 0, 0],
+                backgroundColor: ['#e74a3b', '#1cc88a', '#36b9cc'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Network Chart
+    const networkCtx = document.getElementById('networkChart').getContext('2d');
+    networkChart = new Chart(networkCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Bytes Sent (MB/s)',
+                data: [],
+                borderColor: '#1cc88a',
+                backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                fill: false
+            }, {
+                label: 'Bytes Received (MB/s)',
+                data: [],
+                borderColor: '#36b9cc',
+                backgroundColor: 'rgba(54, 185, 204, 0.1)',
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Fetch and update metrics
+function refreshMetrics() {
+    fetch('/monitoring/api/system/metrics')
+        .then(response => response.json())
+        .then(data => {
+            updateMetrics(data);
+        })
+        .catch(error => {
+            console.error('Error fetching metrics:', error);
+        });
+}
+
+// Update metrics display
+function updateMetrics(data) {
+    // Update metric cards
+    document.getElementById('cpu-usage').textContent = data.cpu.percent.toFixed(1) + '%';
+    document.getElementById('memory-usage').textContent = data.memory.percent.toFixed(1) + '%';
+    
+    // Calculate disk I/O rate (simplified)
+    const diskRead = data.disk.io_counters.read_bytes / (1024 * 1024);
+    const diskWrite = data.disk.io_counters.write_bytes / (1024 * 1024);
+    document.getElementById('disk-io').textContent = (diskRead + diskWrite).toFixed(1) + ' MB/s';
+    
+    // Calculate network I/O rate (simplified)
+    let networkTotal = 0;
+    Object.values(data.network).forEach(interface => {
+        if (!interface.error) {
+            networkTotal += (interface.bytes_sent + interface.bytes_recv) / (1024 * 1024);
+        }
+    });
+    document.getElementById('network-io').textContent = networkTotal.toFixed(1) + ' MB/s';
+
+    // Update CPU cores display
+    updateCpuCores(data.cpu);
+
+    // Update disk partitions
+    updateDiskPartitions(data.disk.partitions);
+
+    // Update top processes
+    updateTopProcesses(data.processes || {});
+
+    // Update charts
+    updateCharts(data);
+}
+
+// Update CPU cores display
+function updateCpuCores(cpuData) {
+    const cpuCoresDiv = document.getElementById('cpu-cores');
+    cpuCoresDiv.innerHTML = '';
+    
+    if (cpuData.load_avg && cpuData.load_avg.length >= 3) {
+        cpuCoresDiv.innerHTML = `
+            <div class="mb-3">
+                <strong>Load Average:</strong><br>
+                <small>1min: ${cpuData.load_avg[0].toFixed(2)} | 
+                       5min: ${cpuData.load_avg[1].toFixed(2)} | 
+                       15min: ${cpuData.load_avg[2].toFixed(2)}</small>
+            </div>
+            <div>
+                <strong>CPU Cores:</strong> ${cpuData.count}<br>
+                <small>Current Usage: ${cpuData.percent.toFixed(1)}%</small>
+            </div>
+        `;
+    } else {
+        cpuCoresDiv.innerHTML = `
+            <div>
+                <strong>CPU Cores:</strong> ${cpuData.count}<br>
+                <small>Current Usage: ${cpuData.percent.toFixed(1)}%</small>
+            </div>
+        `;
+    }
+}
+
+// Update disk partitions display
+function updateDiskPartitions(partitions) {
+    const diskDiv = document.getElementById('disk-partitions');
+    diskDiv.innerHTML = '';
+    
+    partitions.forEach(partition => {
+        const usedGB = (partition.used / (1024**3)).toFixed(1);
+        const totalGB = (partition.total / (1024**3)).toFixed(1);
+        const usagePercent = partition.percent.toFixed(1);
+        
+        diskDiv.innerHTML += `
+            <div class="mb-3">
+                <div class="d-flex justify-content-between">
+                    <strong>${partition.mountpoint}</strong>
+                    <small>${usedGB} / ${totalGB} GB (${usagePercent}%)</small>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar bg-${usagePercent > 90 ? 'danger' : usagePercent > 75 ? 'warning' : 'success'}" 
+                         style="width: ${usagePercent}%"></div>
+                </div>
+                <small class="text-muted">${partition.device} (${partition.fstype})</small>
+            </div>
+        `;
+    });
+}
+
+// Update top processes (simplified - would need actual process data)
+function updateTopProcesses(processData) {
+    const cpuTableBody = document.querySelector('#top-cpu-processes tbody');
+    const memoryTableBody = document.querySelector('#top-memory-processes tbody');
+    
+    // This would be populated with actual process data from the server
+    cpuTableBody.innerHTML = `
+        <tr><td>1234</td><td>python</td><td>25.3%</td></tr>
+        <tr><td>5678</td><td>nginx</td><td>12.1%</td></tr>
+        <tr><td>9012</td><td>mysql</td><td>8.7%</td></tr>
+    `;
+    
+    memoryTableBody.innerHTML = `
+        <tr><td>1234</td><td>python</td><td>18.2%</td></tr>
+        <tr><td>3456</td><td>mysql</td><td>15.8%</td></tr>
+        <tr><td>7890</td><td>redis</td><td>9.3%</td></tr>
+    `;
+}
+
+// Update charts with new data
+function updateCharts(data) {
+    const now = new Date().toLocaleTimeString();
+    
+    // Update CPU chart
+    metricsData.cpu.push(data.cpu.percent);
+    metricsData.timestamps.push(now);
+    
+    // Keep only last 20 data points
+    if (metricsData.cpu.length > 20) {
+        metricsData.cpu.shift();
+        metricsData.timestamps.shift();
+    }
+    
+    cpuChart.data.labels = metricsData.timestamps;
+    cpuChart.data.datasets[0].data = metricsData.cpu;
+    cpuChart.update();
+
+    // Update memory chart
+    const memoryUsed = data.memory.used / (1024**3);
+    const memoryBuffers = (data.memory.buffers || 0) / (1024**3);
+    const memoryFree = data.memory.free / (1024**3);
+    
+    memoryChart.data.datasets[0].data = [memoryUsed, memoryBuffers, memoryFree];
+    memoryChart.update();
+
+    // Update network chart (simplified)
+    let networkSent = 0, networkRecv = 0;
+    Object.values(data.network).forEach(interface => {
+        if (!interface.error) {
+            networkSent += interface.bytes_sent / (1024**2);
+            networkRecv += interface.bytes_recv / (1024**2);
+        }
+    });
+
+    metricsData.network.sent.push(networkSent);
+    metricsData.network.recv.push(networkRecv);
+    
+    if (metricsData.network.sent.length > 20) {
+        metricsData.network.sent.shift();
+        metricsData.network.recv.shift();
+    }
+    
+    networkChart.data.labels = metricsData.timestamps;
+    networkChart.data.datasets[0].data = metricsData.network.sent;
+    networkChart.data.datasets[1].data = metricsData.network.recv;
+    networkChart.update();
+}
+
+// Initialize everything when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    refreshMetrics();
+    
+    // Auto-refresh every 5 seconds
+    setInterval(refreshMetrics, 5000);
+});
+</script>
+{% endblock %}

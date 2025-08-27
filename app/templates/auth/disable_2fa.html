@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Disable Two-Factor Authentication - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Disable Two-Factor Authentication</h1>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- 2FA Disable -->
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="bi bi-shield-x"></i> Disable Two-Factor Authentication
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Security Warning:</strong> Disabling two-factor authentication will make your account less secure. Anyone with your username and password will be able to access your account.
+                    </div>
+
+                    <form method="POST" class="needs-validation" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.password.label(class="form-label") }}
+                            {{ form.password(class="form-control", required=True) }}
+                            {% for error in form.password.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">Enter your current password to verify your identity</div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.totp_code.label(class="form-label") }}
+                            {{ form.totp_code(class="form-control text-center", placeholder="000000", maxlength="6", pattern="[0-9]{6}", required=True) }}
+                            {% for error in form.totp_code.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">Enter the current 6-digit code from your authenticator app</div>
+                        </div>
+
+                        <div class="alert alert-info" role="alert">
+                            <h6 class="alert-heading">What happens when you disable 2FA:</h6>
+                            <ul class="mb-0">
+                                <li>Your account will only require username and password to log in</li>
+                                <li>All backup codes will be deleted</li>
+                                <li>Your authenticator app entry can be removed</li>
+                                <li>You can re-enable 2FA at any time from your dashboard</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-warning btn-lg") }}
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <div class="text-center">
+                        <p class="text-muted">
+                            <i class="bi bi-lightbulb"></i>
+                            <strong>Recommendation:</strong> Consider keeping 2FA enabled for better account security. 
+                            If you're having issues with your authenticator device, contact your administrator for assistance.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        const forms = document.getElementsByClassName('needs-validation');
+        Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+
+// Only allow numbers in TOTP code
+document.addEventListener('DOMContentLoaded', function() {
+    const totpInput = document.querySelector('input[name="totp_code"]');
+    if (totpInput) {
+        totpInput.addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    }
+});
+</script>
+{% endblock %}

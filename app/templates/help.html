@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+
+{% block title %}Help & Documentation - MoxNAS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Help & Documentation</h1>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Quick Start Guide -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-rocket"></i> Quick Start Guide
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="step-item">
+                                <i class="bi bi-1-circle-fill display-4 text-primary"></i>
+                                <h6 class="mt-2">Setup Storage</h6>
+                                <small class="text-muted">Scan and configure your storage devices</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="step-item">
+                                <i class="bi bi-2-circle-fill display-4 text-success"></i>
+                                <h6 class="mt-2">Create Pools</h6>
+                                <small class="text-muted">Setup RAID pools for data protection</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="step-item">
+                                <i class="bi bi-3-circle-fill display-4 text-info"></i>
+                                <h6 class="mt-2">Setup Shares</h6>
+                                <small class="text-muted">Create network shares for file access</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="step-item">
+                                <i class="bi bi-4-circle-fill display-4 text-warning"></i>
+                                <h6 class="mt-2">Configure Backups</h6>
+                                <small class="text-muted">Setup automated backup schedules</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documentation Sections -->
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Storage Management -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-hdd-stack"></i> Storage Management
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="storageAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#storage-devices">
+                                    <i class="bi bi-hdd me-2"></i> Managing Storage Devices
+                                </button>
+                            </h2>
+                            <div id="storage-devices" class="accordion-collapse collapse show" data-bs-parent="#storageAccordion">
+                                <div class="accordion-body">
+                                    <h6>Device Detection</h6>
+                                    <p>MoxNAS automatically scans for available storage devices. Go to <strong>Storage > Devices</strong> and click "Scan Devices" to detect new drives.</p>
+                                    
+                                    <h6>SMART Monitoring</h6>
+                                    <p>Monitor drive health using SMART data. Devices showing warnings should be replaced before failure.</p>
+                                    
+                                    <h6>Device Status Indicators</h6>
+                                    <ul>
+                                        <li><span class="badge bg-success">Healthy</span> - Device is operating normally</li>
+                                        <li><span class="badge bg-warning">Warning</span> - Device shows signs of potential issues</li>
+                                        <li><span class="badge bg-danger">Failed</span> - Device has failed or is failing</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#storage-pools">
+                                    <i class="bi bi-layers me-2"></i> Creating Storage Pools
+                                </button>
+                            </h2>
+                            <div id="storage-pools" class="accordion-collapse collapse" data-bs-parent="#storageAccordion">
+                                <div class="accordion-body">
+                                    <h6>RAID Levels</h6>
+                                    <ul>
+                                        <li><strong>RAID 0:</strong> Striping for performance (no redundancy)</li>
+                                        <li><strong>RAID 1:</strong> Mirroring for redundancy (50% capacity loss)</li>
+                                        <li><strong>RAID 5:</strong> Striping with parity (requires 3+ drives)</li>
+                                        <li><strong>RAID 10:</strong> Striped mirrors (requires 4+ drives)</li>
+                                    </ul>
+                                    
+                                    <h6>Pool Creation Steps</h6>
+                                    <ol>
+                                        <li>Navigate to <strong>Storage > Pools</strong></li>
+                                        <li>Click "Create Pool"</li>
+                                        <li>Select devices and RAID level</li>
+                                        <li>Choose filesystem (ext4 recommended)</li>
+                                        <li>Click "Create Pool"</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#datasets">
+                                    <i class="bi bi-folder me-2"></i> Managing Datasets
+                                </button>
+                            </h2>
+                            <div id="datasets" class="accordion-collapse collapse" data-bs-parent="#storageAccordion">
+                                <div class="accordion-body">
+                                    <h6>What are Datasets?</h6>
+                                    <p>Datasets are logical storage units within pools that help organize your data with individual quotas and settings.</p>
+                                    
+                                    <h6>Dataset Features</h6>
+                                    <ul>
+                                        <li>Individual storage quotas</li>
+                                        <li>Compression settings</li>
+                                        <li>Snapshot support</li>
+                                        <li>Access control</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Sharing -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="bi bi-share"></i> File Sharing
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="sharingAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#smb-shares">
+                                    <i class="bi bi-windows me-2"></i> SMB/CIFS Shares
+                                </button>
+                            </h2>
+                            <div id="smb-shares" class="accordion-collapse collapse show" data-bs-parent="#sharingAccordion">
+                                <div class="accordion-body">
+                                    <h6>Windows File Sharing</h6>
+                                    <p>SMB (Server Message Block) is ideal for Windows environments and mixed networks.</p>
+                                    
+                                    <h6>Connection Instructions</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Windows:</strong> <code>\\server-ip\share-name</code><br>
+                                        <strong>macOS/Linux:</strong> <code>smb://server-ip/share-name</code>
+                                    </div>
+                                    
+                                    <h6>Security Options</h6>
+                                    <ul>
+                                        <li>Guest access (no authentication required)</li>
+                                        <li>User authentication</li>
+                                        <li>Read-only or read-write access</li>
+                                        <li>Host-based access restrictions</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#nfs-shares">
+                                    <i class="bi bi-server me-2"></i> NFS Shares
+                                </button>
+                            </h2>
+                            <div id="nfs-shares" class="accordion-collapse collapse" data-bs-parent="#sharingAccordion">
+                                <div class="accordion-body">
+                                    <h6>Network File System</h6>
+                                    <p>NFS is ideal for Unix/Linux environments and provides excellent performance.</p>
+                                    
+                                    <h6>Mount Command</h6>
+                                    <div class="alert alert-info">
+                                        <code>mount -t nfs server-ip:/path/to/share /mnt/mountpoint</code>
+                                    </div>
+                                    
+                                    <h6>NFS Features</h6>
+                                    <ul>
+                                        <li>High performance for Unix/Linux</li>
+                                        <li>Native file permissions</li>
+                                        <li>Stateless protocol</li>
+                                        <li>Excellent for virtualization</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ftp-shares">
+                                    <i class="bi bi-cloud-upload me-2"></i> FTP Shares
+                                </button>
+                            </h2>
+                            <div id="ftp-shares" class="accordion-collapse collapse" data-bs-parent="#sharingAccordion">
+                                <div class="accordion-body">
+                                    <h6>File Transfer Protocol</h6>
+                                    <p>FTP provides simple file transfer capabilities with broad client support.</p>
+                                    
+                                    <h6>Connection Details</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Server:</strong> server-ip<br>
+                                        <strong>Port:</strong> 21 (standard FTP)<br>
+                                        <strong>Protocol:</strong> FTP or SFTP (secure)
+                                    </div>
+                                    
+                                    <h6>Use Cases</h6>
+                                    <ul>
+                                        <li>Simple file uploads/downloads</li>
+                                        <li>Web server content management</li>
+                                        <li>Backup file transfers</li>
+                                        <li>Cross-platform compatibility</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup Management -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="bi bi-shield-check"></i> Backup Management
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <h6>Backup Job Types</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-archive display-4 text-primary"></i>
+                                    <h6 class="mt-2">Full Backup</h6>
+                                    <small class="text-muted">Complete copy of all data</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-arrow-up-circle display-4 text-success"></i>
+                                    <h6 class="mt-2">Incremental</h6>
+                                    <small class="text-muted">Only changed files</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-arrow-repeat display-4 text-info"></i>
+                                    <h6 class="mt-2">Differential</h6>
+                                    <small class="text-muted">Changes since last full backup</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-4">Schedule Expressions</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Expression</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>0 2 * * *</code></td>
+                                    <td>Daily at 2:00 AM</td>
+                                </tr>
+                                <tr>
+                                    <td><code>0 2 * * 0</code></td>
+                                    <td>Weekly on Sunday at 2:00 AM</td>
+                                </tr>
+                                <tr>
+                                    <td><code>0 2 1 * *</code></td>
+                                    <td>Monthly on the 1st at 2:00 AM</td>
+                                </tr>
+                                <tr>
+                                    <td><code>0 */6 * * *</code></td>
+                                    <td>Every 6 hours</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar with Quick Links -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Quick Links</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('storage.index') }}" class="list-group-item list-group-item-action">
+                            <i class="bi bi-hdd-stack text-primary"></i> Storage Management
+                        </a>
+                        <a href="{{ url_for('shares.index') }}" class="list-group-item list-group-item-action">
+                            <i class="bi bi-share text-success"></i> File Shares
+                        </a>
+                        <a href="{{ url_for('backups.index') }}" class="list-group-item list-group-item-action">
+                            <i class="bi bi-shield-check text-warning"></i> Backup Jobs
+                        </a>
+                        <a href="{{ url_for('monitoring.index') }}" class="list-group-item list-group-item-action">
+                            <i class="bi bi-graph-up text-info"></i> System Monitoring
+                        </a>
+                        <a href="{{ url_for('auth.users') }}" class="list-group-item list-group-item-action">
+                            <i class="bi bi-people text-secondary"></i> User Management
+                        </a>
+                        <a href="{{ url_for('monitoring.logs') }}" class="list-group-item list-group-item-action">
+                            <i class="bi bi-file-text text-dark"></i> System Logs
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-danger">Common Issues</h6>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="troubleshootingAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#device-not-detected">
+                                    Device Not Detected
+                                </button>
+                            </h2>
+                            <div id="device-not-detected" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li>Check physical connections</li>
+                                        <li>Verify device power</li>
+                                        <li>Run device scan manually</li>
+                                        <li>Check system logs for errors</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#share-access-issues">
+                                    Share Access Issues
+                                </button>
+                            </h2>
+                            <div id="share-access-issues" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li>Verify share is active</li>
+                                        <li>Check user permissions</li>
+                                        <li>Confirm network connectivity</li>
+                                        <li>Review firewall settings</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#backup-failures">
+                                    Backup Failures
+                                </button>
+                            </h2>
+                            <div id="backup-failures" class="accordion-collapse collapse" data-bs-parent="#troubleshootingAccordion">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li>Check available disk space</li>
+                                        <li>Verify source/destination paths</li>
+                                        <li>Review backup job logs</li>
+                                        <li>Test manual backup run</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Support -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Need More Help?</h6>
+                </div>
+                <div class="card-body text-center">
+                    <i class="bi bi-headset display-4 text-success mb-3"></i>
+                    <h6>Contact Support</h6>
+                    <p class="text-muted small">Our support team is here to help you with any questions or issues.</p>
+                    <div class="d-grid gap-2">
+                        <a href="mailto:support@moxnas.com" class="btn btn-success btn-sm">
+                            <i class="bi bi-envelope"></i> Email Support
+                        </a>
+                        <a href="/docs" class="btn btn-outline-info btn-sm">
+                            <i class="bi bi-book"></i> Full Documentation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Add search functionality to help content
+document.addEventListener('DOMContentLoaded', function() {
+    // You could add a search box to filter help content
+    console.log('Help page loaded successfully');
+    
+    // Highlight current section based on URL fragment
+    if (window.location.hash) {
+        const target = document.querySelector(window.location.hash);
+        if (target && target.classList.contains('collapse')) {
+            const collapse = new bootstrap.Collapse(target, { show: true });
+        }
+    }
+});
+</script>
+{% endblock %}
