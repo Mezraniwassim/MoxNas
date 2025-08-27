@@ -51,10 +51,11 @@ IP_CONFIG=${IP_CONFIG:-"dhcp"}
 
 # Check if template exists
 msg_info "Checking Debian template"
-if ! pveam list local | grep -q "debian-12-standard"; then
+TEMPLATE="local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+if ! pveam list local 2>/dev/null | grep -q "debian-12-standard_12.7-1_amd64.tar.zst"; then
     msg_info "Downloading Debian 12 template"
-    pveam update
-    pveam download local debian-12-standard_12.7-1_amd64.tar.zst
+    pveam update >/dev/null 2>&1
+    pveam download local debian-12-standard_12.7-1_amd64.tar.zst >/dev/null 2>&1
 fi
 msg_ok "Template ready"
 
@@ -76,13 +77,13 @@ pct create ${CTID} ${TEMPLATE} \
     --cores ${CORES} \
     --hostname ${CT_HOSTNAME} \
     --memory ${MEMORY} \
-    --net0 name=eth0,bridge=${NETWORK},firewall=1,ip=${IP_CONFIG},type=veth \
+    --net0 name=eth0,bridge=${NETWORK},ip=${IP_CONFIG} \
     --ostype debian \
     --password ${PASSWORD} \
     --rootfs ${STORAGE}:${DISK_SIZE} \
     --swap 512 \
     --unprivileged 1 \
-    --features nesting=1,mount=nfs;cifs \
+    --features nesting=1 \
     --startup order=1 \
     --onboot 1
 
