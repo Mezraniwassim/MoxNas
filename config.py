@@ -79,11 +79,13 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL') or \
+    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI') or os.environ.get('DATABASE_URL') or os.environ.get('TEST_DATABASE_URL') or \
         'sqlite:///test.db'
-    WTF_CSRF_ENABLED = False
+    WTF_CSRF_ENABLED = os.environ.get('WTF_CSRF_ENABLED', 'false').lower() == 'true'
     REDIS_URL = os.environ.get('REDIS_URL') or 'memory://'
     CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL') or 'memory://'
+    CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'false').lower() == 'true'
+    CELERY_TASK_EAGER_PROPAGATES = os.environ.get('CELERY_TASK_EAGER_PROPAGATES', 'false').lower() == 'true'
 
 class ProductionConfig(Config):
     """Production configuration"""

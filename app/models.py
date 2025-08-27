@@ -51,6 +51,23 @@ class LogLevel(enum.Enum):
     ERROR = 'error'
     CRITICAL = 'critical'
 
+class AlertSeverity(enum.Enum):
+    LOW = 'low'
+    MEDIUM = 'medium'
+    HIGH = 'high'
+    CRITICAL = 'critical'
+
+class SourceType(enum.Enum):
+    DIRECTORY = 'directory'
+    DEVICE = 'device'
+    DATASET = 'dataset'
+
+class DestinationType(enum.Enum):
+    DIRECTORY = 'directory'
+    S3 = 's3'
+    REMOTE = 'remote'
+    FTP = 'ftp'
+
 class User(UserMixin, db.Model):
     """User model with enhanced security features"""
     __tablename__ = 'users'
@@ -60,6 +77,10 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.USER)
+    
+    # Personal information
+    first_name = db.Column(db.String(64))
+    last_name = db.Column(db.String(64))
     
     # Security fields
     failed_login_attempts = db.Column(db.Integer, default=0)
@@ -173,6 +194,16 @@ class StorageDevice(db.Model):
             return json.loads(self.smart_data)
         return {}
     
+    @property
+    def serial_number(self):
+        """Alias for device_serial for compatibility"""
+        return self.device_serial
+    
+    @serial_number.setter
+    def serial_number(self, value):
+        """Setter for serial_number alias"""
+        self.device_serial = value
+    
     def __repr__(self):
         return f'<StorageDevice {self.device_name}>'
 
@@ -261,6 +292,7 @@ class Share(db.Model):
     name = db.Column(db.String(128), unique=True, nullable=False)
     protocol = db.Column(db.Enum(ShareProtocol), nullable=False)
     dataset_id = db.Column(db.Integer, db.ForeignKey('datasets.id'), nullable=False)
+    path = db.Column(db.String(512))  # Share path
     
     # Access control
     owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -305,7 +337,9 @@ class BackupJob(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), unique=True, nullable=False)
+    source_type = db.Column(db.Enum(SourceType), nullable=False, default=SourceType.DIRECTORY)
     source_path = db.Column(db.String(512), nullable=False)
+    destination_type = db.Column(db.Enum(DestinationType), nullable=False, default=DestinationType.DIRECTORY)
     destination_path = db.Column(db.String(512), nullable=False)
     
     # Backup settings
@@ -386,8 +420,9 @@ class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    severity = db.Column(db.Enum(LogLevel), nullable=False)
+    severity = db.Column(db.Enum(AlertSeverity), nullable=False)
     category = db.Column(db.String(64), nullable=False)
+    component = db.Column(db.String(64))  # Component that generated the alert
     
     # Status
     is_active = db.Column(db.Boolean, default=True)

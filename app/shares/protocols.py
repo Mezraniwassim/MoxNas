@@ -146,6 +146,25 @@ class SMBManager(ShareProtocolManager):
             )
         
         return connections
+    
+    def get_active_connections(self) -> List[Dict]:
+        """Alias for get_smb_connections for compatibility"""
+        return self.get_smb_connections()
+    
+    def restart_service(self) -> bool:
+        """Restart SMB service"""
+        try:
+            success, stdout, stderr = self.run_command(['systemctl', 'restart', 'smbd'])
+            if success:
+                success, stdout, stderr = self.run_command(['systemctl', 'restart', 'nmbd'])
+            return success
+        except Exception as e:
+            SystemLog.log_event(
+                level=LogLevel.ERROR,
+                category='shares',
+                message=f'Failed to restart SMB service: {str(e)}'
+            )
+            return False
 
 class NFSManager(ShareProtocolManager):
     """NFS share management"""
@@ -263,6 +282,33 @@ class NFSManager(ShareProtocolManager):
             )
         
         return connections
+    
+    def get_exports(self) -> List[Dict]:
+        """Get current NFS exports"""
+        exports = []
+        try:
+            success, stdout, stderr = self.run_command(['exportfs'])
+            if success:
+                lines = stdout.split('\\n')
+                for line in lines:
+                    if line.strip():
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            exports.append({
+                                'path': parts[0],
+                                'client': parts[1] if len(parts) > 1 else '*'
+                            })
+        except Exception as e:
+            SystemLog.log_event(
+                level=LogLevel.WARNING,
+                category='shares',
+                message=f'Failed to get NFS exports: {str(e)}'
+            )
+        return exports
+    
+    def get_active_connections(self) -> List[Dict]:
+        """Alias for get_nfs_connections for compatibility"""
+        return self.get_nfs_connections()
 
 class FTPManager(ShareProtocolManager):
     """FTP share management"""

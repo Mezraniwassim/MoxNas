@@ -11,19 +11,56 @@ from app.models import (
 )
 
 @pytest.fixture
+def smb_share(app, storage_pool, admin_user):
+    """Create test SMB share"""
+    with app.app_context():
+        # Refresh objects in the current session
+        storage_pool = db.session.merge(storage_pool)
+        admin_user = db.session.merge(admin_user)
+        
+        # Create a dataset first
+        from app.models import Dataset
+        dataset = Dataset(
+            name='test_smb_dataset',
+            path='/mnt/storage/test_smb',
+            pool_id=storage_pool.id,
+            created_by_id=admin_user.id
+        )
+        db.session.add(dataset)
+        db.session.flush()  # Get the dataset ID
+        
+        share = Share(
+            name='test_smb_share',
+            protocol=ShareProtocol.SMB,
+            dataset_id=dataset.id,
+            path='/mnt/storage/test_smb',
+            read_only=True,
+            guest_access=True,
+            owner_id=admin_user.id,
+            created_by_id=admin_user.id
+        )
+        db.session.add(share)
+        db.session.commit()
+        return shareport (
+    User, UserRole, StoragePool, StorageDevice, Share, 
+    ShareProtocol, Alert, AlertSeverity, BackupJob, SourceType, DestinationType
+)
+
+@pytest.fixture
 def app():
     """Create and configure a test app instance"""
     # Create a temporary directory for test database
     db_fd, db_path = tempfile.mkstemp()
     
-    app = create_app({
-        'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
-        'WTF_CSRF_ENABLED': False,
-        'SECRET_KEY': 'test-secret-key',
-        'CELERY_TASK_ALWAYS_EAGER': True,
-        'CELERY_TASK_EAGER_PROPAGATES': True,
-    })
+    # Set environment variables for test configuration
+    os.environ['TESTING'] = 'True'
+    os.environ['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    os.environ['WTF_CSRF_ENABLED'] = 'False'
+    os.environ['SECRET_KEY'] = 'test-secret-key'
+    os.environ['CELERY_TASK_ALWAYS_EAGER'] = 'True'
+    os.environ['CELERY_TASK_EAGER_PROPAGATES'] = 'True'
+    
+    app = create_app('testing')
     
     with app.app_context():
         db.create_all()
@@ -97,10 +134,13 @@ def authenticated_user_client(client, regular_user):
 def storage_pool(app, admin_user):
     """Create test storage pool"""
     with app.app_context():
+        # Refresh the user object in the current session
+        admin_user = db.session.merge(admin_user)
         pool = StoragePool(
             name='test_pool',
             raid_level='raid1',
             filesystem_type='ext4',
+            mount_point='/mnt/test_pool',
             total_size=1000000000,  # 1GB
             used_size=100000000,    # 100MB
             created_by_id=admin_user.id
@@ -113,12 +153,14 @@ def storage_pool(app, admin_user):
 def storage_device(app, storage_pool):
     """Create test storage device"""
     with app.app_context():
+        # Refresh the pool object in the current session
+        storage_pool = db.session.merge(storage_pool)
         device = StorageDevice(
             device_name='/dev/sdb1',
             device_path='/dev/sdb1',
             device_size=500000000,  # 500MB
             device_model='Test Drive',
-            serial_number='TEST123',
+            device_serial='TEST123',
             pool_id=storage_pool.id
         )
         db.session.add(device)
@@ -129,13 +171,29 @@ def storage_device(app, storage_pool):
 def nfs_share(app, storage_pool, admin_user):
     """Create test NFS share"""
     with app.app_context():
+        # Refresh objects in the current session
+        storage_pool = db.session.merge(storage_pool)
+        admin_user = db.session.merge(admin_user)
+        
+        # Create a dataset first
+        from app.models import Dataset
+        dataset = Dataset(
+            name='test_dataset',
+            path='/mnt/storage/test_nfs',
+            pool_id=storage_pool.id,
+            created_by_id=admin_user.id
+        )
+        db.session.add(dataset)
+        db.session.flush()  # Get the dataset ID
+        
         share = Share(
             name='test_nfs_share',
             protocol=ShareProtocol.NFS,
-            dataset_id=storage_pool.id,
+            dataset_id=dataset.id,
             path='/mnt/storage/test_nfs',
             read_only=False,
             guest_access=False,
+            owner_id=admin_user.id,
             created_by_id=admin_user.id
         )
         db.session.add(share)

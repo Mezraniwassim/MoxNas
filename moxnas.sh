@@ -1,86 +1,61 @@
 #!/usr/bin/env bash
-
-# MoxNAS Standalone Installation Script
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2024 MoxNAS Contributors
+# Author: MoxNAS Team  
 # License: MIT
-
-set -euo pipefail
-
-# Colors for output
-RD='\033[01;31m'
-YW='\033[33m'
-GN='\033[1;92m'
-CL='\033[m'
-BL='\033[36m'
-
-function msg_info() {
-    echo -e "${BL}[INFO]${CL} $1"
-}
-
-function msg_ok() {
-    echo -e "${GN}[OK]${CL} $1"
-}
-
-function msg_error() {
-    echo -e "${RD}[ERROR]${CL} $1"
-    exit 1
-}
 
 # App Default Values
 APP="MoxNAS"
-CTID=${CTID:-$(pvesh get /cluster/nextid)}
-HOSTNAME=${CT_HOSTNAME:-"moxnas"}
-DISK_SIZE=${DISK_SIZE:-"20"}
-CORES=${CORES:-"4"}
-MEMORY=${MEMORY:-"4096"}
-PASSWORD=${PASSWORD:-"moxnas1234"}
-BRIDGE=${BRIDGE:-"vmbr0"}
-STORAGE=${STORAGE:-"local-lvm"}
-TEMPLATE_STORAGE=${TEMPLATE_STORAGE:-"local"}
+var_tags="nas;storage;samba;nfs;ftp;truenas"
+var_cpu="4"
+var_ram="4096"
+var_disk="20"
+var_os="debian"
+var_version="12"
+var_unprivileged="0"
 
-echo "🚀 MoxNAS LXC Container Installation"
-echo "====================================="
+# App Output & Base Settings
+header_info "$APP"
+base_settings
+variables
+color
+catch_errors
 
-msg_info "Container Configuration"
-echo "  ID: $CTID"
-echo "  Hostname: $HOSTNAME"  
-echo "  Disk: ${DISK_SIZE}GB"
-echo "  CPU Cores: $CORES"
-echo "  Memory: ${MEMORY}MB"
-echo "  Password: moxnas1234"
-echo ""
+function update_script() {
+    header_info
+    check_container_storage
+    check_container_resources
+    if [[ ! -d /opt/moxnas ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
+    
+    msg_info "Updating $APP LXC"
+    
+    # Stop services
+    systemctl stop moxnas moxnas-worker nginx
+    
+    # Update system packages
+    apt-get update && apt-get -y upgrade
+    
+    # Update MoxNAS application  
+    cd /opt/moxnas
+    git pull origin master
+    
+    # Update Python dependencies
+    source venv/bin/activate
+    pip install --upgrade -r requirements.txt
+    
+    # Run database migrations
+    python migrate.py
+    
+    # Restart services
+    systemctl start postgresql redis-server nginx moxnas moxnas-worker
+    
+    msg_ok "Updated $APP LXC"
+    exit
+}
 
-# Check if container ID already exists
-if pct status $CTID &>/dev/null; then
-    msg_error "Container ID $CTID already exists"
-fi
-
-# Create LXC container
-msg_info "Creating LXC container"
-pct create $CTID ${TEMPLATE_STORAGE}:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst \
-    --hostname $HOSTNAME \
-    --memory $MEMORY \
-    --cores $CORES \
-    --rootfs ${STORAGE}:${DISK_SIZE} \
-    --net0 name=eth0,bridge=${BRIDGE},firewall=1,ip=dhcp \
-    --password $PASSWORD \
-    --privileged 1 \
-    --features keyctl=1,nesting=1,fuse=1 \
-    --onboot 1 \
-    --tags "nas,storage,samba,nfs,ftp"
-
-msg_ok "LXC Container $CTID created successfully"
-
-# Start container
-msg_info "Starting container"
-pct start $CTID
-
-# Wait for container to be ready
-sleep 10
-
-# Get container IP
-CONTAINER_IP=$(pct exec $CTID -- hostname -I | awk '{print $1}')
-msg_info "Container IP: $CONTAINER_IP"
+start
+build_container
+description
 
 # Install MoxNAS
 msg_info "Installing MoxNAS application"

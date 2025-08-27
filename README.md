@@ -40,8 +40,7 @@ MoxNAS/
 ├── requirements.txt              # Dependencies
 ├── wsgi.py                       # WSGI entry point
 ├── celery_worker.py              # Celery worker
-├── install-moxnas-lxc.sh          # LXC installation script
-├── moxnas-lxc-community.sh        # Community-standard script
+├── moxnas.sh                      # One-command installation script
 └── install-moxnas.sh              # Standalone installation
 ```
 
@@ -75,31 +74,19 @@ MoxNAS/
 
 ## 🚀 Quick Installation
 
-### **Option 1: Community-Standard Script** ⭐ **(Recommended)**
+### **One-Command Installation** ⭐ **(Recommended)**
 ```bash
 # Run on Proxmox host
-bash /home/wassim/Documents/MoxNAS/moxnas-lxc-community.sh
+bash /home/wassim/Documents/MoxNAS/moxnas.sh
 ```
-- ✅ Follows Proxmox community standards
-- ✅ Standard menu interface with customization options
-- ✅ Built-in update functionality
-- ✅ Proper error handling and verification
-
-### **Option 2: Direct LXC Installation**
-```bash
-# Alternative installation method
-bash /home/wassim/Documents/MoxNAS/install-moxnas-lxc.sh
-```
-- ✅ Direct container creation
-- ✅ Streamlined installation process
 
 ### **Remote Installation** (When repository is public)
 ```bash
 # Download and run in one command
-bash <(curl -s https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/moxnas-lxc-community.sh)
+bash <(curl -s https://raw.githubusercontent.com/Mezraniwassim/MoxNas/master/moxnas.sh)
 ```
 
-**What these scripts do:**
+**What this script does:**
 - ✅ Creates optimized Debian 12 LXC container
 - ✅ Installs all dependencies and services
 - ✅ Configures PostgreSQL database with secure credentials
