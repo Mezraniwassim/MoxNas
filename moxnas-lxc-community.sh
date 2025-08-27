@@ -58,31 +58,32 @@ build_container
 description
 
 msg_info "Setting up container"
+lxc-attach -n "$CTID" -- bash -c "
+set -e
 
 # Update system and install dependencies
-$STD apt-get update
-$STD apt-get -y upgrade
+apt-get update && apt-get -y upgrade
 
 # Install system packages
-$STD apt-get -y install curl wget git sudo mc htop
+apt-get -y install curl wget git sudo mc htop
 
 # Install Python and development tools
-$STD apt-get -y install python3 python3-pip python3-venv python3-dev build-essential
+apt-get -y install python3 python3-pip python3-venv python3-dev build-essential
 
 # Install database and cache services
-$STD apt-get -y install postgresql postgresql-contrib redis-server
+apt-get -y install postgresql postgresql-contrib redis-server
 
 # Install web server
-$STD apt-get -y install nginx
+apt-get -y install nginx
 
 # Install NFS and SMB services
-$STD apt-get -y install nfs-kernel-server samba samba-common-bin
+apt-get -y install nfs-kernel-server samba samba-common-bin
 
 # Install FTP server
-$STD apt-get -y install vsftpd
+apt-get -y install vsftpd
 
 # Install storage management tools
-$STD apt-get -y install lvm2 smartmontools parted
+apt-get -y install lvm2 smartmontools parted
 
 # Create MoxNAS user and application directory
 adduser --system --group --disabled-password --home /opt/moxnas moxnas
@@ -90,37 +91,29 @@ mkdir -p /opt/moxnas
 chown moxnas:moxnas /opt/moxnas
 
 # Clone MoxNAS repository
-msg_info "Installing MoxNAS application"
 cd /opt/moxnas
-
-# Use existing install script from local development
-$STD cp /home/wassim/Documents/MoxNAS/install-moxnas.sh install-moxnas.sh
-$STD chmod +x install-moxnas.sh
-$STD ./install-moxnas.sh
+git clone https://github.com/Mezraniwassim/MoxNas.git .
+rm -rf .git
 
 # Set ownership
 chown -R moxnas:moxnas /opt/moxnas
 
 # Create Python virtual environment
 sudo -u moxnas python3 -m venv venv
-sudo -u moxnas bash -c "source venv/bin/activate && pip install --upgrade pip"
-sudo -u moxnas bash -c "source venv/bin/activate && pip install -r requirements.txt"
+sudo -u moxnas bash -c 'source venv/bin/activate && pip install --upgrade pip'
+sudo -u moxnas bash -c 'source venv/bin/activate && pip install -r requirements.txt'
 
 # Configure PostgreSQL
-msg_info "Configuring database"
-sudo -u postgres createuser -D -A -P moxnas << EOF
-moxnas1234
-moxnas1234
-EOF
-sudo -u postgres createdb -O moxnas moxnas_db
+sudo -u postgres psql -c \"CREATE USER moxnas WITH PASSWORD 'moxnas1234';\"
+sudo -u postgres psql -c \"CREATE DATABASE moxnas_db OWNER moxnas;\"
 
 # Configure Redis
-redis_password="moxnas1234"
-echo "requirepass $redis_password" >> /etc/redis/redis.conf
+echo 'requirepass moxnas1234' >> /etc/redis/redis.conf
 systemctl restart redis-server
 
 # Create application configuration
-cat > /opt/moxnas/config/production.py << EOF
+mkdir -p /opt/moxnas/config
+cat > /opt/moxnas/config/production.py << 'PYEOF'
 import os
 
 class ProductionConfig:
@@ -130,39 +123,36 @@ class ProductionConfig:
     CELERY_BROKER_URL = 'redis://:moxnas1234@localhost:6379/0'
     CELERY_RESULT_BACKEND = 'redis://:moxnas1234@localhost:6379/0'
     REDIS_URL = 'redis://:moxnas1234@localhost:6379/1'
-EOF
+PYEOF
 
 # Initialize database
-sudo -u moxnas bash -c "cd /opt/moxnas && source venv/bin/activate && python migrate.py"
+sudo -u moxnas bash -c 'cd /opt/moxnas && source venv/bin/activate && python migrate.py'
 
 # Create admin user
-sudo -u moxnas bash -c "cd /opt/moxnas && source venv/bin/activate && python -c \"
+sudo -u moxnas bash -c 'cd /opt/moxnas && source venv/bin/activate && python -c \"
 from app import create_app, db
 from app.models import User
 from werkzeug.security import generate_password_hash
 
-app = create_app('production')
+app = create_app(\\\"production\\\")
 with app.app_context():
-    admin = User.query.filter_by(username='admin').first()
+    admin = User.query.filter_by(username=\\\"admin\\\").first()
     if not admin:
         admin = User(
-            username='admin',
-            email='admin@moxnas.local',
-            password_hash=generate_password_hash('moxnas1234'),
+            username=\\\"admin\\\",
+            email=\\\"admin@moxnas.local\\\",
+            password_hash=generate_password_hash(\\\"moxnas1234\\\"),
             is_admin=True
         )
         db.session.add(admin)
         db.session.commit()
-        print('Admin user created')
+        print(\\\"Admin user created\\\")
     else:
-        print('Admin user already exists')
-\""
+        print(\\\"Admin user already exists\\\")
+\"'
 
 # Configure systemd services
-msg_info "Setting up services"
-
-# MoxNAS main service
-cat > /etc/systemd/system/moxnas.service << 'EOF'
+cat > /etc/systemd/system/moxnas.service << 'SVCEOF'
 [Unit]
 Description=MoxNAS Web Application
 After=network.target postgresql.service redis-server.service
@@ -187,10 +177,9 @@ ProtectHome=false
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SVCEOF
 
-# MoxNAS worker service
-cat > /etc/systemd/system/moxnas-worker.service << 'EOF'
+cat > /etc/systemd/system/moxnas-worker.service << 'WKREOF'
 [Unit]
 Description=MoxNAS Celery Worker
 After=network.target redis-server.service
@@ -215,15 +204,15 @@ ProtectHome=false
 
 [Install]
 WantedBy=multi-user.target
-EOF
+WKREOF
 
 # Configure Nginx
-cat > /etc/nginx/sites-available/moxnas << 'EOF'
+cat > /etc/nginx/sites-available/moxnas << 'NGXEOF'
 server {
     listen 80;
     listen [::]:80;
     server_name _;
-    return 301 https://$server_name$request_uri;
+    return 301 https://\$server_name\$request_uri;
 }
 
 server {
@@ -240,28 +229,27 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
-EOF
+NGXEOF
 
 # Generate SSL certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/ssl/private/moxnas.key \
     -out /etc/ssl/certs/moxnas.crt \
-    -subj "/C=US/ST=State/L=City/O=MoxNAS/CN=moxnas" 2>/dev/null
+    -subj \"/C=US/ST=State/L=City/O=MoxNAS/CN=moxnas\" 2>/dev/null
 
 # Enable Nginx site
 ln -sf /etc/nginx/sites-available/moxnas /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
 # Configure SMB
-msg_info "Configuring network shares"
 mkdir -p /mnt/storage
-cat >> /etc/samba/smb.conf << 'EOF'
+cat >> /etc/samba/smb.conf << 'SMBEOF'
 
 [moxnas-storage]
     comment = MoxNAS Storage
@@ -272,13 +260,13 @@ cat >> /etc/samba/smb.conf << 'EOF'
     valid users = root
     create mask = 0755
     directory mask = 0755
-EOF
+SMBEOF
 
 # Set SMB password
-(echo "moxnas1234"; echo "moxnas1234") | smbpasswd -a root
+(echo 'moxnas1234'; echo 'moxnas1234') | smbpasswd -a root
 
 # Configure NFS
-echo "/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)" >> /etc/exports
+echo '/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)' >> /etc/exports
 
 # Configure FTP
 sed -i 's/#write_enable=YES/write_enable=YES/' /etc/vsftpd.conf
@@ -295,39 +283,12 @@ systemctl start nginx smbd nmbd nfs-kernel-server vsftpd
 systemctl start moxnas moxnas-worker
 
 # Save credentials
-echo "Username: admin" > /opt/moxnas/.admin_credentials
-echo "Password: moxnas1234" >> /opt/moxnas/.admin_credentials
+echo 'Username: admin' > /opt/moxnas/.admin_credentials
+echo 'Password: moxnas1234' >> /opt/moxnas/.admin_credentials
 
-msg_info "Creating storage test shares"
-# Create test directories and mount points
-mkdir -p /mnt/test-smb /mnt/test-nfs
-echo "MoxNAS Storage Test" > /mnt/storage/README.txt
-
-# Mount test shares
-mount -t cifs //127.0.0.1/moxnas-storage /mnt/test-smb -o username=root,password=moxnas1234,iocharset=utf8,file_mode=0777,dir_mode=0777 2>/dev/null || true
-mount -t nfs 127.0.0.1:/mnt/storage /mnt/test-nfs 2>/dev/null || true
-
-# Create mount script for testing
-cat > /opt/moxnas/mount-shares.sh << 'EOF'
-#!/bin/bash
-case "${1:-mount}" in
-    mount)
-        mkdir -p /mnt/test-smb /mnt/test-nfs
-        mount -t cifs //127.0.0.1/moxnas-storage /mnt/test-smb -o username=root,password=moxnas1234,iocharset=utf8,file_mode=0777,dir_mode=0777 2>/dev/null || echo "SMB mount failed"
-        mount -t nfs 127.0.0.1:/mnt/storage /mnt/test-nfs 2>/dev/null || echo "NFS mount failed"
-        echo "Test shares mounted"
-        ;;
-    test)
-        echo "Testing share write access..."
-        echo "SMB test: $(date)" > /mnt/test-smb/smb-test.txt 2>/dev/null && echo "✅ SMB write OK" || echo "❌ SMB write failed"
-        echo "NFS test: $(date)" > /mnt/test-nfs/nfs-test.txt 2>/dev/null && echo "✅ NFS write OK" || echo "❌ NFS write failed"
-        ;;
-    *)
-        echo "Usage: $0 {mount|test}"
-        ;;
-esac
-EOF
-chmod +x /opt/moxnas/mount-shares.sh
+# Create storage test
+echo 'MoxNAS Storage Test' > /mnt/storage/README.txt
+"
 
 msg_ok "Completed Successfully!\n"
 echo -e "${APP} should be reachable by going to the following URL.
