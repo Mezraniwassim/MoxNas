@@ -128,18 +128,37 @@ start_container() {
     
     # Wait for container to be ready
     msg_info "Waiting for container to initialize..."
-    sleep 15
+    sleep 20
     
-    # Check if container is accessible
-    for i in {1..30}; do
-        if pct exec $CTID -- systemctl is-active systemd-resolved >/dev/null 2>&1; then
+    # Check if container is accessible with multiple methods
+    for i in {1..60}; do
+        # Try simple command first
+        if pct exec $CTID -- echo "test" >/dev/null 2>&1; then
+            msg_info "Container responding to commands..."
+            sleep 5
+            # Then check if basic services are ready
+            if pct exec $CTID -- systemctl is-system-running >/dev/null 2>&1 || \
+               pct exec $CTID -- ls /bin/bash >/dev/null 2>&1; then
+                break
+            fi
+        fi
+        
+        if [ $i -eq 60 ]; then
+            msg_warn "Container initialization timeout, but continuing installation..."
             break
         fi
-        if [ $i -eq 30 ]; then
-            msg_error "Container failed to initialize properly"
+        
+        if [ $((i % 10)) -eq 0 ]; then
+            msg_info "Still waiting for container... ($i/60)"
         fi
-        sleep 2
+        
+        sleep 3
     done
+    
+    # Final check that container is accessible
+    if ! pct exec $CTID -- echo "Container ready" >/dev/null 2>&1; then
+        msg_error "Container is not responding. Check container status: pct status $CTID"
+    fi
     
     msg_ok "Container is ready"
 }
