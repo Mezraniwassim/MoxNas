@@ -2,20 +2,33 @@
 import pytest
 import json
 from unittest.mock import Mock, patch
-from app.models import StoragePool, StorageDevice, PoolStatus, DeviceStatus
+from app.models import StoragePool, StorageDevice, PoolStatus, DeviceStatus, User, UserRole
 from app.storage.manager import StorageManager
 from app import db
 
 class TestStoragePool:
     """Test StoragePool model"""
     
-    def test_storage_pool_creation(self, app, admin_user):
+    def test_storage_pool_creation(self, app):
         """Test storage pool creation"""
         with app.app_context():
+            # Find or create admin user in this session context
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                admin_user = User(
+                    username='admin',
+                    email='admin@test.com',
+                    role=UserRole.ADMIN
+                )
+                admin_user.set_password('AdminPassword123!')
+                db.session.add(admin_user)
+                db.session.commit()
+                
             pool = StoragePool(
                 name='test_pool',
                 raid_level='raid1',
                 filesystem_type='ext4',
+                mount_point='/mnt/test_pool',
                 total_size=2000000000,
                 used_size=500000000,
                 created_by_id=admin_user.id
@@ -31,17 +44,42 @@ class TestStoragePool:
             assert created_pool.filesystem_type == 'ext4'
             assert created_pool.status == PoolStatus.HEALTHY
     
-    def test_storage_pool_usage_percentage(self, storage_pool):
+    def test_storage_pool_usage_percentage(self, app):
         """Test storage pool usage percentage calculation"""
-        # Pool has 1GB total, 100MB used
-        assert storage_pool.usage_percentage == 10.0
-        
-        # Test edge cases
-        storage_pool.used_size = 0
-        assert storage_pool.usage_percentage == 0.0
-        
-        storage_pool.total_size = 0
-        assert storage_pool.usage_percentage == 0.0
+        with app.app_context():
+            # Create a storage pool in this session context
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                admin_user = User(
+                    username='admin',
+                    email='admin@test.com',
+                    role=UserRole.ADMIN
+                )
+                admin_user.set_password('AdminPassword123!')
+                db.session.add(admin_user)
+                db.session.commit()
+            
+            storage_pool = StoragePool(
+                name='usage_test_pool',
+                raid_level='raid1',
+                filesystem_type='ext4',
+                mount_point='/mnt/usage_test',
+                total_size=1000000000,  # 1GB
+                used_size=100000000,    # 100MB 
+                created_by_id=admin_user.id
+            )
+            db.session.add(storage_pool)
+            db.session.commit()
+            
+            # Test percentage calculation (100MB / 1GB = 10%)
+            assert storage_pool.usage_percentage == 10.0
+            
+            # Test edge cases
+            storage_pool.used_size = 0
+            assert storage_pool.usage_percentage == 0.0
+            
+            storage_pool.total_size = 0
+            assert storage_pool.usage_percentage == 0.0
     
     def test_storage_pool_available_space(self, storage_pool):
         """Test available space calculation"""

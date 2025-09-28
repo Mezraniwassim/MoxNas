@@ -7,6 +7,8 @@ Flask-Migrate==4.0.5
 Flask-Limiter==3.5.0
 Flask-Mail==0.9.1
 Flask-CORS==4.0.0
+Flask-SocketIO==5.3.6
+eventlet==0.33.3
 
 # Database
 psycopg2-binary==2.9.7
@@ -62,3 +64,10 @@ pytest-cov==4.1.0
 # Code Quality
 flake8==6.1.0
 black==23.11.0
+
+# Missing dependencies
+blosc2==2.6.2
+cffi==1.16.0
+
+# Updated WebSocket support
+websockets==12.0

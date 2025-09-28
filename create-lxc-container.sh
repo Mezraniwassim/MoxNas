@@ -17,7 +17,7 @@ GN='\033[1;92m'
 CL='\033[m'
 BOLD='\033[1m'
 
-# Default LXC configuration
+# Default LXC configuration - Optimized for NAS workloads
 DEFAULT_CTID="200"
 DEFAULT_HOSTNAME="moxnas"
 DEFAULT_CORES="4"
@@ -26,6 +26,12 @@ DEFAULT_DISK_SIZE="20"
 DEFAULT_BRIDGE="vmbr0"
 DEFAULT_TEMPLATE="ubuntu-24.04-standard_24.04-2_amd64.tar.xz"
 DEFAULT_STORAGE="local-lvm"
+
+# Storage optimization settings
+THIN_PROVISION="1"
+PREALLOCATION="metadata"  # For faster allocation
+DISCARD_SUPPORT="1"       # Enable TRIM/discard for SSDs
+COMPRESS_LEVEL="6"        # Balance between compression and performance
 
 # Function definitions
 header_info() {

@@ -16,12 +16,15 @@ os.environ['REDIS_URL'] = 'memory://'
 os.environ['CELERY_BROKER_URL'] = 'memory://'
 os.environ['TESTING'] = 'True'
 os.environ['SECRET_KEY'] = 'dev-secret-key-for-local-testing'
+os.environ['RATELIMIT_ENABLED'] = 'False'
 
 try:
-    from app import create_app, db
-    from app.models import User, UserRole, SystemLog, LogLevel
+    from app import create_app, db, socketio
     
     app = create_app('testing')
+    
+    # Import models after app creation to avoid circular imports
+    from app.models import User, UserRole, SystemLog, LogLevel
     
     print("🚀 Démarrage de MoxNAS en local...")
     print(f"📍 Base de données: {app.config.get('SQLALCHEMY_DATABASE_URI')}")
@@ -41,7 +44,7 @@ try:
                 email='admin@moxnas.local',
                 role=UserRole.ADMIN
             )
-            admin_user.set_password('admin123')
+            admin_user.set_password('AdminPassword123!')
             db.session.add(admin_user)
             
             # Create a regular user too
@@ -49,14 +52,14 @@ try:
                 username='user',
                 email='user@moxnas.local'
             )
-            regular_user.set_password('user1234')
+            regular_user.set_password('UserPassword123!')
             db.session.add(regular_user)
             
             db.session.commit()
             
             print("✅ Utilisateurs créés:")
-            print("   👤 admin / admin123 (Administrateur)")
-            print("   👤 user / user1234 (Utilisateur)")
+            print("   👤 admin / AdminPassword123! (Administrateur)")
+            print("   👤 user / UserPassword123! (Utilisateur)")
             
             # Log the startup
             SystemLog.log_event(
@@ -73,7 +76,7 @@ try:
         print("🎯 Accédez à MoxNAS:")
         print("   🌐 URL: http://localhost:5000")
         print("   👤 Login: admin")
-        print("   🔑 Password: admin123")
+        print("   🔑 Password: AdminPassword123!")
         print()
         print("⚠️  Mode développement - CSRF désactivé")
         print("📊 Base de données SQLite locale")
@@ -81,13 +84,17 @@ try:
         print("🛑 Ctrl+C pour arrêter")
         print("=" * 50)
     
-    # Run the Flask development server
-    app.run(
+    # Background updates will be started automatically by the websocket module
+    
+    # Run the enhanced Flask-SocketIO server
+    print("🔄 Starting enhanced MoxNAS with real-time features...")
+    socketio.run(
+        app,
         host='0.0.0.0',
-        port=5000,
+        port=5001,
         debug=True,
         use_reloader=True,
-        threaded=True
+        allow_unsafe_werkzeug=True
     )
     
 except KeyboardInterrupt:

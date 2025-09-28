@@ -14,10 +14,10 @@
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-left-primary shadow h-100 py-2">
             <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">CPU Usage</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ "%.1f" | format(system_stats.cpu_percent) }}%</div>
+                <div class="row g-0 align-items-center">
+                    <div class="col me-2">
+                        <div class="text-xs fw-bold text-primary text-uppercase mb-1">CPU Usage</div>
+                        <div class="h5 mb-0 fw-bold text-dark" id="cpu-usage" data-stat="cpu-percent">{{ "%.1f" | format(system_stats.cpu_percent) }}%</div>
                     </div>
                     <div class="col-auto">
                         <i class="bi bi-cpu text-gray-300" style="font-size: 2rem;"></i>
@@ -30,10 +30,10 @@
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-left-success shadow h-100 py-2">
             <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
+                <div class="row g-0 align-items-center">
+                    <div class="col me-2">
                         <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Memory Usage</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ "%.1f" | format(system_stats.memory.percent) }}%</div>
+                        <div class="h5 mb-0 fw-bold text-dark" id="memory-usage" data-stat="memory-percent">{{ "%.1f" | format(system_stats.memory.percent) }}%</div>
                     </div>
                     <div class="col-auto">
                         <i class="bi bi-memory text-gray-300" style="font-size: 2rem;"></i>
@@ -46,10 +46,10 @@
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-left-info shadow h-100 py-2">
             <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
+                <div class="row g-0 align-items-center">
+                    <div class="col me-2">
                         <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Storage Usage</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ "%.1f" | format((used_storage / total_storage * 100) if total_storage > 0 else 0) }}%</div>
+                        <div class="h5 mb-0 fw-bold text-dark" id="disk-usage" data-stat="disk-percent">{{ "%.1f" | format((used_storage / total_storage * 100) if total_storage > 0 else 0) }}%</div>
                     </div>
                     <div class="col-auto">
                         <i class="bi bi-hdd text-gray-300" style="font-size: 2rem;"></i>
@@ -62,10 +62,10 @@
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="card border-left-warning shadow h-100 py-2">
             <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
+                <div class="row g-0 align-items-center">
+                    <div class="col me-2">
                         <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Active Shares</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ shares_summary.active }}</div>
+                        <div class="h5 mb-0 fw-bold text-dark" id="uptime">{{ shares_summary.active }}</div>
                     </div>
                     <div class="col-auto">
                         <i class="bi bi-share text-gray-300" style="font-size: 2rem;"></i>
@@ -82,6 +82,27 @@
         <div class="card shadow mb-4">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                 <h6 class="m-0 font-weight-bold text-primary">System Performance</h6>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button class="dropdown-item" data-action="refresh-dashboard">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <div class="dropdown-item">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="autoRefresh" data-toggle="auto-refresh" checked>
+                                    <label class="form-check-label" for="autoRefresh">Auto-refresh</label>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
             </div>
             <div class="card-body">
                 <div class="chart-container" style="position: relative; height: 300px;">
@@ -96,7 +117,7 @@
             <div class="card-header py-3">
                 <h6 class="m-0 font-weight-bold text-primary">Storage Pool Status</h6>
             </div>
-            <div class="card-body">
+            <div class="card-body" data-section="storage-pools">
                 {% for pool in storage_pools %}
                 <div class="mb-3">
                     <div class="d-flex justify-content-between">
@@ -194,81 +215,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-// Real-time performance chart
-let performanceChart;
-
-function initPerformanceChart() {
-    const ctx = document.getElementById('performanceChart').getContext('2d');
-    
-    performanceChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'CPU %',
-                data: [],
-                borderColor: 'rgb(75, 192, 192)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                tension: 0.1
-            }, {
-                label: 'Memory %',
-                data: [],
-                borderColor: 'rgb(255, 99, 132)',
-                backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            }
-        }
-    });
-}
-
-function updatePerformanceChart() {
-    fetch('{{ url_for("main.system_stats_api") }}')
-        .then(response => response.json())
-        .then(data => {
-            const now = new Date().toLocaleTimeString();
-            
-            // Add new data point
-            performanceChart.data.labels.push(now);
-            performanceChart.data.datasets[0].data.push(data.cpu.percent);
-            performanceChart.data.datasets[1].data.push(data.memory.percent);
-            
-            // Keep only last 20 data points
-            if (performanceChart.data.labels.length > 20) {
-                performanceChart.data.labels.shift();
-                performanceChart.data.datasets[0].data.shift();
-                performanceChart.data.datasets[1].data.shift();
-            }
-            
-            performanceChart.update('none');
-        })
-        .catch(error => console.error('Error updating performance chart:', error));
-}
-
-// Initialize chart and start updates
-document.addEventListener('DOMContentLoaded', function() {
-    initPerformanceChart();
-    
-    // Update every 5 seconds
-    setInterval(updatePerformanceChart, 5000);
-    
-    // Initial update
-    updatePerformanceChart();
-});
-</script>
 {% endblock %}

@@ -43,7 +43,6 @@ MoxNAS/
 ├── moxnas.sh                      # One-command installation script
 └── install-moxnas.sh              # Standalone installation
 ```
-
 ## 🛠️ Technology Stack
 
 - **Backend**: Flask 2.3+ with Blueprint architecture

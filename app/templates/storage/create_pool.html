@@ -21,6 +21,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('storage.create_pool') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <!-- Pool Name -->
                         <div class="mb-3">
                             <label for="name" class="form-label">Pool Name</label>
@@ -57,8 +58,11 @@
                                             <label class="form-check-label" for="device_{{ device.id }}">
                                                 <strong>{{ device.device_path }}</strong><br>
                                                 <small class="text-muted">
-                                                    {{ device.model or 'Unknown Model' }} - 
-                                                    {{ (device.size / 1024**3) | round(1) if device.size else 'Unknown' }} GB
+                                                    {{ device.device_model or 'Unknown Model' }} - 
+                                                    {{ (device.device_size / 1024**3) | round(1) if device.device_size else 'Unknown' }} GB
+                                                    {% if device.temperature %}
+                                                        - {{ device.temperature }}°C
+                                                    {% endif %}
                                                     {% if device.status %}
                                                         <span class="badge bg-{{ 'success' if device.status.value == 'healthy' else 'warning' }}">
                                                             {{ device.status.value.title() }}
@@ -162,42 +166,320 @@
 
 {% block scripts %}
 <script>
-// Pool type validation
-document.getElementById('pool_type').addEventListener('change', function() {
-    const poolType = this.value;
-    const deviceCheckboxes = document.querySelectorAll('input[name="devices"]');
-    const selectedDevices = Array.from(deviceCheckboxes).filter(cb => cb.checked);
-    
-    // Add validation logic based on pool type requirements
-    let minDevices = 1;
-    switch(poolType) {
-        case 'mirror':
-            minDevices = 2;
-            break;
-        case 'raidz1':
-            minDevices = 3;
-            break;
-        case 'raidz2':
-            minDevices = 4;
-            break;
-        case 'raidz3':
-            minDevices = 5;
-            break;
+// Enhanced Pool Creation with Modern JavaScript
+class PoolCreationManager {
+    constructor() {
+        this.form = document.querySelector('form');
+        this.raidSelect = document.getElementById('raid_level');
+        this.deviceCheckboxes = document.querySelectorAll('input[name="devices"]');
+        this.submitBtn = document.querySelector('button[type="submit"]');
+        this.init();
     }
     
-    // Update form validation dynamically
-    deviceCheckboxes.forEach(cb => {
-        cb.addEventListener('change', function() {
-            const selected = Array.from(deviceCheckboxes).filter(c => c.checked).length;
-            const submitBtn = document.querySelector('button[type="submit"]');
+    init() {
+        this.bindEvents();
+        this.updateDeviceSelection();
+        this.initTooltips();
+    }
+    
+    bindEvents() {
+        // RAID level change
+        if (this.raidSelect) {
+            this.raidSelect.addEventListener('change', () => {
+                this.updateDeviceRequirements();
+                this.updateDeviceSelection();
+            });
+        }
+        
+        // Device selection changes
+        this.deviceCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                this.updateDeviceSelection();
+                this.updateStorageEstimate();
+            });
+        });
+        
+        // Form submission
+        if (this.form) {
+            this.form.addEventListener('submit', (e) => {
+                if (!this.validateForm()) {
+                    e.preventDefault();
+                }
+            });
+        }
+        
+        // Real-time validation
+        const inputs = this.form.querySelectorAll('input[required], select[required]');
+        inputs.forEach(input => {
+            input.addEventListener('blur', () => {
+                this.validateField(input);
+            });
             
-            if (selected >= minDevices) {
-                submitBtn.disabled = false;
+            input.addEventListener('input', () => {
+                this.clearFieldError(input);
+            });
+        });
+    }
+    
+    updateDeviceRequirements() {
+        const raidLevel = this.raidSelect.value;
+        const requirements = this.getRAIDRequirements(raidLevel);
+        
+        // Update help text
+        const helpText = document.querySelector('.device-requirements');
+        if (helpText) {
+            helpText.textContent = requirements.description;
+        }
+        
+        // Update device selection UI
+        this.updateDeviceSelectionUI(requirements);
+    }
+    
+    getRAIDRequirements(raidLevel) {
+        const requirements = {
+            'single': { min: 1, max: 1, description: 'Select 1 device' },
+            'mirror': { min: 2, max: null, description: 'Select 2 or more devices' },
+            'raidz1': { min: 3, max: null, description: 'Select 3 or more devices' },
+            'raidz2': { min: 4, max: null, description: 'Select 4 or more devices' },
+            'raidz3': { min: 5, max: null, description: 'Select 5 or more devices' },
+            'stripe': { min: 2, max: null, description: 'Select 2 or more devices' }
+        };
+        
+        return requirements[raidLevel] || { min: 1, max: null, description: 'Select devices' };
+    }
+    
+    updateDeviceSelectionUI(requirements) {
+        this.deviceCheckboxes.forEach((checkbox, index) => {
+            const parent = checkbox.closest('.form-check');
+            
+            // Remove existing classes
+            parent.classList.remove('device-required', 'device-optional', 'device-disabled');
+            
+            if (requirements.max && index >= requirements.max) {
+                parent.classList.add('device-disabled');
+                checkbox.disabled = true;
+                checkbox.checked = false;
             } else {
-                submitBtn.disabled = true;
+                checkbox.disabled = false;
+                if (index < requirements.min) {
+                    parent.classList.add('device-required');
+                } else {
+                    parent.classList.add('device-optional');
+                }
             }
         });
-    });
+    }
+    
+    updateDeviceSelection() {
+        const selected = Array.from(this.deviceCheckboxes).filter(cb => cb.checked);
+        const raidLevel = this.raidSelect.value;
+        const requirements = this.getRAIDRequirements(raidLevel);
+        
+        // Update submit button state
+        const isValid = selected.length >= requirements.min && 
+                       (!requirements.max || selected.length <= requirements.max);
+        
+        if (this.submitBtn) {
+            this.submitBtn.disabled = !isValid || selected.length === 0;
+        }
+        
+        // Update selection counter
+        this.updateSelectionCounter(selected.length, requirements);
+        
+        // Update capacity estimate
+        this.updateCapacityEstimate(selected);
+    }
+    
+    updateSelectionCounter(selectedCount, requirements) {
+        let counter = document.querySelector('.device-counter');
+        if (!counter) {
+            counter = document.createElement('div');
+            counter.className = 'device-counter mt-2';
+            document.querySelector('.mb-3:has(input[name="devices"])')?.appendChild(counter);
+        }
+        
+        const status = selectedCount >= requirements.min ? 'text-success' : 'text-warning';
+        counter.className = `device-counter mt-2 ${status}`;
+        counter.innerHTML = `
+            <small>
+                <i class="bi bi-info-circle me-1"></i>
+                Selected: ${selectedCount} device${selectedCount !== 1 ? 's' : ''}
+                (Required: ${requirements.min}${requirements.max ? ` - ${requirements.max}` : '+'})
+            </small>
+        `;
+    }
+    
+    updateCapacityEstimate(selectedDevices) {
+        if (selectedDevices.length === 0) return;
+        
+        // Get device sizes (this would come from the backend data)
+        let totalCapacity = 0;
+        let effectiveCapacity = 0;
+        
+        selectedDevices.forEach(device => {
+            const sizeText = device.closest('.form-check').querySelector('small')?.textContent;
+            const sizeMatch = sizeText?.match(/([\d.]+)\s*GB/);
+            if (sizeMatch) {
+                totalCapacity += parseFloat(sizeMatch[1]);
+            }
+        });
+        
+        // Calculate effective capacity based on RAID level
+        const raidLevel = this.raidSelect.value;
+        effectiveCapacity = this.calculateEffectiveCapacity(totalCapacity, selectedDevices.length, raidLevel);
+        
+        this.displayCapacityEstimate(totalCapacity, effectiveCapacity);
+    }
+    
+    calculateEffectiveCapacity(total, deviceCount, raidLevel) {
+        switch (raidLevel) {
+            case 'single':
+            case 'stripe':
+                return total;
+            case 'mirror':
+                return total / 2;
+            case 'raidz1':
+                return total * (deviceCount - 1) / deviceCount;
+            case 'raidz2':
+                return total * (deviceCount - 2) / deviceCount;
+            case 'raidz3':
+                return total * (deviceCount - 3) / deviceCount;
+            default:
+                return total;
+        }
+    }
+    
+    displayCapacityEstimate(total, effective) {
+        let estimate = document.querySelector('.capacity-estimate');
+        if (!estimate) {
+            estimate = document.createElement('div');
+            estimate.className = 'capacity-estimate alert alert-info mt-3';
+            this.form.querySelector('.row')?.appendChild(estimate);
+        }
+        
+        const efficiency = effective / total * 100;
+        estimate.innerHTML = `
+            <h6><i class="bi bi-calculator me-2"></i>Capacity Estimate</h6>
+            <div class="row">
+                <div class="col-sm-6">
+                    <strong>Raw Capacity:</strong> ${total.toFixed(1)} GB
+                </div>
+                <div class="col-sm-6">
+                    <strong>Usable Capacity:</strong> ${effective.toFixed(1)} GB
+                </div>
+            </div>
+            <div class="mt-2">
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar" style="width: ${efficiency}%"></div>
+                </div>
+                <small class="text-muted">Storage Efficiency: ${efficiency.toFixed(1)}%</small>
+            </div>
+        `;
+    }
+    
+    updateStorageEstimate() {
+        // Real-time storage calculation as user selects devices
+        const selectedDevices = Array.from(this.deviceCheckboxes).filter(cb => cb.checked);
+        this.updateCapacityEstimate(selectedDevices);
+    }
+    
+    validateForm() {
+        let isValid = true;
+        
+        // Validate required fields
+        const requiredInputs = this.form.querySelectorAll('input[required], select[required]');
+        requiredInputs.forEach(input => {
+            if (!this.validateField(input)) {
+                isValid = false;
+            }
+        });
+        
+        // Validate device selection
+        const selectedDevices = Array.from(this.deviceCheckboxes).filter(cb => cb.checked);
+        if (selectedDevices.length === 0) {
+            this.showError('Please select at least one device');
+            isValid = false;
+        }
+        
+        return isValid;
+    }
+    
+    validateField(field) {
+        const value = field.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+        
+        if (field.hasAttribute('required') && !value) {
+            isValid = false;
+            errorMessage = 'This field is required';
+        } else if (field.type === 'text' && field.name === 'name') {
+            // Pool name validation
+            if (value && !/^[a-zA-Z0-9_-]+$/.test(value)) {
+                isValid = false;
+                errorMessage = 'Pool name can only contain letters, numbers, underscores, and hyphens';
+            }
+        }
+        
+        this.showFieldValidation(field, isValid, errorMessage);
+        return isValid;
+    }
+    
+    showFieldValidation(field, isValid, message) {
+        const parent = field.closest('.mb-3') || field.parentNode;
+        let feedback = parent.querySelector('.invalid-feedback');
+        
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            parent.appendChild(feedback);
+        }
+        
+        feedback.textContent = isValid ? '' : message;
+        field.classList.toggle('is-invalid', !isValid);
+        field.classList.toggle('is-valid', isValid && field.value.trim() !== '');
+    }
+    
+    clearFieldError(field) {
+        field.classList.remove('is-invalid', 'is-valid');
+        const parent = field.closest('.mb-3') || field.parentNode;
+        const feedback = parent.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.textContent = '';
+        }
+    }
+    
+    showError(message) {
+        if (window.moxnas && window.moxnas.stateManager) {
+            window.moxnas.stateManager.showNotification(message, 'danger');
+        } else {
+            alert(message);
+        }
+    }
+    
+    initTooltips() {
+        // Add helpful tooltips to RAID options
+        const raidOptions = this.raidSelect.querySelectorAll('option');
+        const tooltipData = {
+            'single': 'No redundancy. Fastest performance but no fault tolerance.',
+            'mirror': 'Data duplicated across drives. Can survive 1 drive failure.',
+            'raidz1': 'Single parity. Can survive 1 drive failure. Good balance of performance and redundancy.',
+            'raidz2': 'Double parity. Can survive 2 drive failures. Better redundancy.',
+            'raidz3': 'Triple parity. Can survive 3 drive failures. Maximum redundancy.',
+            'stripe': 'Data striped across drives. Fastest performance but no fault tolerance.'
+        };
+        
+        raidOptions.forEach(option => {
+            const tooltip = tooltipData[option.value];
+            if (tooltip) {
+                option.title = tooltip;
+            }
+        });
+    }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    new PoolCreationManager();
 });
 </script>
 {% endblock %}
