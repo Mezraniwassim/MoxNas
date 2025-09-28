@@ -27,7 +27,7 @@ var_unprivileged="0"
 # Default LXC configuration
 DEFAULT_CTID=""
 DEFAULT_HOSTNAME="moxnas"
-DEFAULT_TEMPLATE="debian-12-standard_12.2-1_amd64.tar.zst"
+DEFAULT_TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"
 DEFAULT_STORAGE="local-lvm"
 DEFAULT_BRIDGE="vmbr0"
 
@@ -77,11 +77,25 @@ get_next_ctid() {
 
 # Check if template exists and download if needed
 check_template() {
-    if ! pveam list local | grep -q "$DEFAULT_TEMPLATE"; then
-        msg_info "Downloading Debian 12 template..."
-        pveam download local $DEFAULT_TEMPLATE
+    # Check for any available Debian 12 template
+    local available_template
+    available_template=$(pveam available | grep "debian-12-standard" | head -1 | awk '{print $2}')
+    
+    if [ -z "$available_template" ]; then
+        msg_error "No Debian 12 template available. Please download manually: pveam update && pveam available | grep debian-12"
     fi
-    msg_ok "Container template ready"
+    
+    # Use the available template
+    DEFAULT_TEMPLATE="$available_template"
+    
+    # Download if not already present
+    if ! pveam list local | grep -q "$(basename $DEFAULT_TEMPLATE .tar.zst)"; then
+        msg_info "Downloading Debian 12 template: $DEFAULT_TEMPLATE"
+        if ! pveam download local "$DEFAULT_TEMPLATE"; then
+            msg_error "Failed to download template. Try: pveam update && pveam download local $DEFAULT_TEMPLATE"
+        fi
+    fi
+    msg_ok "Container template ready: $DEFAULT_TEMPLATE"
 }
 
 # Create LXC container
