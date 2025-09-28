@@ -75,25 +75,11 @@ get_next_ctid() {
     msg_error "No available container IDs found (200-999)"
 }
 
-# Check if template exists and download if needed
+# Check if template exists
 check_template() {
-    # Check for any available Debian 12 template
-    local available_template
-    available_template=$(pveam available | grep "debian-12-standard" | head -1 | awk '{print $2}')
-    
-    if [ -z "$available_template" ]; then
-        msg_error "No Debian 12 template available. Please download manually: pveam update && pveam available | grep debian-12"
-    fi
-    
-    # Use the available template
-    DEFAULT_TEMPLATE="$available_template"
-    
-    # Download if not already present
-    if ! pveam list local | grep -q "$(basename $DEFAULT_TEMPLATE .tar.zst)"; then
-        msg_info "Downloading Debian 12 template: $DEFAULT_TEMPLATE"
-        if ! pveam download local "$DEFAULT_TEMPLATE"; then
-            msg_error "Failed to download template. Try: pveam update && pveam download local $DEFAULT_TEMPLATE"
-        fi
+    # Check if the default template exists locally
+    if ! pveam list local | grep -q "debian-12-standard_12.7-1_amd64.tar.zst"; then
+        msg_error "Template debian-12-standard_12.7-1_amd64.tar.zst not found. Please download it first: pveam download local debian-12-standard_12.7-1_amd64.tar.zst"
     fi
     msg_ok "Container template ready: $DEFAULT_TEMPLATE"
 }
