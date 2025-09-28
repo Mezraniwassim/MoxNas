@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+# MoxNAS Proxmox LXC Installation Script
 # Copyright (c) 2024 MoxNAS Contributors
 # Author: MoxNAS Team  
 # License: MIT
+
+set -euo pipefail
+
+# Colors for output
+YW='\033[33m'
+RD='\033[01;31m'
+BL='\033[36m'
+GN='\033[1;92m'
+CL='\033[m'
+BOLD='\033[1m'
 
 # App Default Values
 APP="MoxNAS"
@@ -14,146 +24,226 @@ var_os="debian"
 var_version="12"
 var_unprivileged="0"
 
-# App Output & Base Settings
-header_info "$APP"
-base_settings
-variables
-color
-catch_errors
+# Default LXC configuration
+DEFAULT_CTID=""
+DEFAULT_HOSTNAME="moxnas"
+DEFAULT_TEMPLATE="debian-12-standard_12.2-1_amd64.tar.zst"
+DEFAULT_STORAGE="local-lvm"
+DEFAULT_BRIDGE="vmbr0"
 
-function update_script() {
-    header_info
-    check_container_storage
-    check_container_resources
-    if [[ ! -d /opt/moxnas ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-    
-    msg_info "Updating $APP LXC"
-    
-    # Stop services
-    systemctl stop moxnas moxnas-worker nginx
-    
-    # Update system packages
-    apt-get update && apt-get -y upgrade
-    
-    # Update MoxNAS application  
-    cd /opt/moxnas
-    git pull origin master
-    
-    # Update Python dependencies
-    source venv/bin/activate
-    pip install --upgrade -r requirements.txt
-    
-    # Run database migrations
-    python migrate.py
-    
-    # Restart services
-    systemctl start postgresql redis-server nginx moxnas moxnas-worker
-    
-    msg_ok "Updated $APP LXC"
-    exit
+# Function definitions
+msg_info() { echo -e "${BL}[INFO]${CL} $1"; }
+msg_ok() { echo -e "${GN}[OK]${CL} $1"; }
+msg_error() { echo -e "${RD}[ERROR]${CL} $1"; exit 1; }
+msg_warn() { echo -e "${YW}[WARN]${CL} $1"; }
+
+header_info() {
+    clear
+    cat << 'EOF'
+    __  ___          _   ___   ___   _____
+   /  |/  /___  _  _/ | / / | / __\ / ___/
+  / /|_/ / __ \| |/_/  |/ /  |/ /_\  \__ \ 
+ / /  / / /_/ />  </ /|  / /|  __/  ___/ /
+/_/  /_/\____/_/|_/_/ |_/_/ |_/    /____/ 
+
+Network Attached Storage for Proxmox LXC
+Automated Installation Script
+EOF
 }
 
-start
-build_container
-description
+# Check Proxmox environment
+check_proxmox() {
+    if ! command -v pct >/dev/null 2>&1; then
+        msg_error "This script must be run on a Proxmox VE host"
+    fi
+    
+    if [ $EUID -ne 0 ]; then
+        msg_error "This script must be run as root"
+    fi
+    
+    msg_ok "Proxmox VE environment validated"
+}
 
-# Install MoxNAS
-msg_info "Installing MoxNAS application"
-pct exec $CTID -- bash -c "
+# Get next available CT ID
+get_next_ctid() {
+    for ((i=200; i<=999; i++)); do
+        if ! pct status $i >/dev/null 2>&1; then
+            echo $i
+            return
+        fi
+    done
+    msg_error "No available container IDs found (200-999)"
+}
+
+# Check if template exists and download if needed
+check_template() {
+    if ! pveam list local | grep -q "$DEFAULT_TEMPLATE"; then
+        msg_info "Downloading Debian 12 template..."
+        pveam download local $DEFAULT_TEMPLATE
+    fi
+    msg_ok "Container template ready"
+}
+
+# Create LXC container
+create_container() {
+    msg_info "Creating LXC container..."
+    
+    # Get next available CT ID
+    if [ -z "$DEFAULT_CTID" ]; then
+        DEFAULT_CTID=$(get_next_ctid)
+    fi
+    
+    local template_path="local:vztmpl/$DEFAULT_TEMPLATE"
+    
+    # Create container
+    if ! pct create $DEFAULT_CTID $template_path \
+        --hostname $DEFAULT_HOSTNAME \
+        --memory $var_ram \
+        --cores $var_cpu \
+        --rootfs $DEFAULT_STORAGE:$var_disk \
+        --password "moxnas1234" \
+        --net0 name=eth0,bridge=$DEFAULT_BRIDGE,ip=dhcp \
+        --ostype debian \
+        --arch amd64 \
+        --unprivileged $var_unprivileged \
+        --features nesting=1,keyctl=1 \
+        --onboot 1 \
+        --timezone host \
+        --protection 0 \
+        --start 0; then
+        msg_error "Failed to create container"
+    fi
+    
+    msg_ok "Container $DEFAULT_CTID created successfully"
+    CTID=$DEFAULT_CTID
+}
+
+# Start container and wait for it to be ready
+start_container() {
+    msg_info "Starting container $CTID..."
+    
+    if ! pct start $CTID; then
+        msg_error "Failed to start container"
+    fi
+    
+    # Wait for container to be ready
+    msg_info "Waiting for container to initialize..."
+    sleep 15
+    
+    # Check if container is accessible
+    for i in {1..30}; do
+        if pct exec $CTID -- systemctl is-active systemd-resolved >/dev/null 2>&1; then
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            msg_error "Container failed to initialize properly"
+        fi
+        sleep 2
+    done
+    
+    msg_ok "Container is ready"
+}
+
+# Install MoxNAS in container
+install_moxnas() {
+    msg_info "Installing MoxNAS in container $CTID..."
+    
+    # Copy GitHub installation script to container
+    cat > /tmp/moxnas-container-install.sh << 'EOF_INSTALL'
+#!/bin/bash
 set -e
+
+export DEBIAN_FRONTEND=noninteractive
 
 # Update system
 apt-get update && apt-get -y upgrade
 
 # Install system packages
-apt-get -y install curl wget git sudo mc htop
-
-# Install Python and development tools
+apt-get -y install curl wget git sudo mc htop nano net-tools
 apt-get -y install python3 python3-pip python3-venv python3-dev build-essential
-
-# Install database and cache services
-apt-get -y install postgresql postgresql-contrib redis-server
-
-# Install web server
-apt-get -y install nginx
-
-# Install NFS and SMB services
-apt-get -y install nfs-kernel-server samba samba-common-bin
-
-# Install FTP server
-apt-get -y install vsftpd
-
-# Install storage management tools
+apt-get -y install postgresql postgresql-contrib redis-server nginx
+apt-get -y install nfs-kernel-server samba samba-common-bin vsftpd
 apt-get -y install lvm2 smartmontools parted
 
-# Create MoxNAS user and application directory
-adduser --system --group --disabled-password --home /opt/moxnas moxnas
-mkdir -p /opt/moxnas
+# Create MoxNAS user and directories
+adduser --system --group --disabled-password --home /opt/moxnas --shell /bin/bash moxnas
+mkdir -p /opt/moxnas /mnt/storage /mnt/backups
 chown moxnas:moxnas /opt/moxnas
+chmod 755 /mnt/storage /mnt/backups
 
-# Clone MoxNAS repository
+# Clone MoxNAS from GitHub
 cd /opt/moxnas
 git clone https://github.com/Mezraniwassim/MoxNas.git .
-rm -rf .git
-
-# Set ownership
 chown -R moxnas:moxnas /opt/moxnas
 
-# Create Python virtual environment
+# Setup Python environment
 sudo -u moxnas python3 -m venv venv
-sudo -u moxnas bash -c 'source venv/bin/activate && pip install --upgrade pip'
+sudo -u moxnas bash -c 'source venv/bin/activate && pip install --upgrade pip setuptools wheel'
 sudo -u moxnas bash -c 'source venv/bin/activate && pip install -r requirements.txt'
 
 # Configure PostgreSQL
-sudo -u postgres psql -c \"CREATE USER moxnas WITH PASSWORD 'moxnas1234';\"
-sudo -u postgres psql -c \"CREATE DATABASE moxnas_db OWNER moxnas;\"
+systemctl start postgresql
+systemctl enable postgresql
+sudo -u postgres psql -c "CREATE USER moxnas WITH PASSWORD 'moxnas1234';"
+sudo -u postgres psql -c "CREATE DATABASE moxnas_db OWNER moxnas;"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE moxnas_db TO moxnas;"
 
 # Configure Redis
-echo 'requirepass moxnas1234' >> /etc/redis/redis.conf
+systemctl start redis-server
+systemctl enable redis-server
+echo "requirepass moxnas1234" >> /etc/redis/redis.conf
 systemctl restart redis-server
 
-# Create application configuration
-mkdir -p /opt/moxnas/config
-cat > /opt/moxnas/config/production.py << 'EOF'
-import os
-
-class ProductionConfig:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'moxnas-secret-key-2024'
-    SQLALCHEMY_DATABASE_URI = 'postgresql://moxnas:moxnas1234@localhost/moxnas_db'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    CELERY_BROKER_URL = 'redis://:moxnas1234@localhost:6379/0'
-    CELERY_RESULT_BACKEND = 'redis://:moxnas1234@localhost:6379/0'
-    REDIS_URL = 'redis://:moxnas1234@localhost:6379/1'
+# Create environment file
+cat > /opt/moxnas/.env << 'EOF'
+SECRET_KEY=$(openssl rand -hex 32)
+DATABASE_URL=postgresql://moxnas:moxnas1234@localhost/moxnas_db
+REDIS_URL=redis://:moxnas1234@localhost:6379/0
+CELERY_BROKER_URL=redis://:moxnas1234@localhost:6379/0
+CELERY_RESULT_BACKEND=redis://:moxnas1234@localhost:6379/0
+FLASK_ENV=production
+FLASK_CONFIG=production
+MOXNAS_STORAGE_ROOT=/mnt/storage
+MOXNAS_BACKUP_ROOT=/mnt/backups
 EOF
+chown moxnas:moxnas /opt/moxnas/.env
 
 # Initialize database
-sudo -u moxnas bash -c 'cd /opt/moxnas && source venv/bin/activate && python migrate.py'
+cd /opt/moxnas
+sudo -u moxnas bash -c 'source venv/bin/activate && source .env && python migrate.py upgrade'
 
-# Create admin user with updated User model
-sudo -u moxnas bash -c 'cd /opt/moxnas && source venv/bin/activate && python -c \"
+# Create admin user
+sudo -u moxnas bash -c 'source venv/bin/activate && source .env && python -c "
 from app import create_app, db
 from app.models import User, UserRole
-from werkzeug.security import generate_password_hash
+import sys
 
-app = create_app(\\\"production\\\")
+app = create_app(\"production\")
 with app.app_context():
-    admin = User.query.filter_by(username=\\\"admin\\\").first()
-    if not admin:
+    try:
+        # Delete existing admin if exists
+        existing_admin = User.query.filter_by(username=\"admin\").first()
+        if existing_admin:
+            db.session.delete(existing_admin)
+            db.session.commit()
+        
+        # Create new admin user
         admin = User(
-            username=\\\"admin\\\",
-            email=\\\"admin@moxnas.local\\\",
-            first_name=\\\"System\\\",
-            last_name=\\\"Administrator\\\",
+            username=\"admin\",
+            email=\"admin@moxnas.local\",
+            first_name=\"System\",
+            last_name=\"Administrator\",
             role=UserRole.ADMIN,
             is_active=True
         )
-        admin.set_password(\\\"moxnas1234\\\")
+        admin.set_password(\"moxnas1234\")
         db.session.add(admin)
         db.session.commit()
-        print(\\\"Admin user created\\\")
-    else:
-        print(\\\"Admin user already exists\\\")
-\"'
+        print(\"Admin user created successfully\")
+    except Exception as e:
+        print(f\"Error creating admin user: {e}\")
+        sys.exit(1)
+"'
 
 # Configure systemd services
 cat > /etc/systemd/system/moxnas.service << 'EOF'
@@ -251,8 +341,10 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 ln -sf /etc/nginx/sites-available/moxnas /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
-# Configure SMB
-mkdir -p /mnt/storage
+# Configure file sharing
+mkdir -p /mnt/storage /mnt/backups
+
+# SMB configuration
 cat >> /etc/samba/smb.conf << 'EOF'
 
 [moxnas-storage]
@@ -266,11 +358,12 @@ cat >> /etc/samba/smb.conf << 'EOF'
     directory mask = 0755
 EOF
 
-# Set SMB password
+# Set SMB password for root
 (echo 'moxnas1234'; echo 'moxnas1234') | smbpasswd -a root
 
-# Configure NFS
+# NFS exports
 echo '/mnt/storage *(rw,sync,no_subtree_check,no_root_squash)' >> /etc/exports
+echo '/mnt/backups *(rw,sync,no_subtree_check,no_root_squash)' >> /etc/exports
 
 # Configure FTP
 sed -i 's/#write_enable=YES/write_enable=YES/' /etc/vsftpd.conf
@@ -283,36 +376,118 @@ systemctl enable moxnas moxnas-worker
 
 # Start services
 systemctl start postgresql redis-server
-systemctl start nginx smbd nmbd nfs-kernel-server vsftpd
+systemctl restart nginx
+systemctl start smbd nmbd nfs-kernel-server vsftpd
 systemctl start moxnas moxnas-worker
 
 # Save credentials
-echo 'Username: admin' > /opt/moxnas/.admin_credentials
-echo 'Password: moxnas1234' >> /opt/moxnas/.admin_credentials
+cat > /opt/moxnas/.admin_credentials << 'EOF'
+Installation completed: $(date)
+Web Interface: https://localhost
+Username: admin
+Password: moxnas1234
 
-# Create storage test
-echo 'MoxNAS Storage Test' > /mnt/storage/README.txt
+Database: moxnas_db
+DB User: moxnas
+DB Password: moxnas1234
+
+SMB Share: //localhost/moxnas-storage
+NFS Share: localhost:/mnt/storage
+FTP: ftp://localhost
+EOF
+
+# Create test data
+echo 'MoxNAS Storage Test - $(date)' > /mnt/storage/README.txt
+echo 'Welcome to MoxNAS - Your Network Attached Storage Solution' > /mnt/storage/welcome.txt
+
+# Cleanup
+apt-get autoremove -y
+apt-get autoclean
 
 echo 'Installation completed successfully!'
-"
+EOF_INSTALL
 
-msg_ok "MoxNAS installation completed!"
+    # Copy and execute installation script
+    pct push $CTID /tmp/moxnas-container-install.sh /tmp/moxnas-container-install.sh
+    pct exec $CTID -- chmod +x /tmp/moxnas-container-install.sh
+    
+    msg_info "Running MoxNAS installation (this may take 10-15 minutes)..."
+    if ! pct exec $CTID -- bash /tmp/moxnas-container-install.sh; then
+        msg_error "MoxNAS installation failed"
+    fi
+    
+    # Clean up installation script
+    pct exec $CTID -- rm -f /tmp/moxnas-container-install.sh
+    rm -f /tmp/moxnas-container-install.sh
+    
+    msg_ok "MoxNAS installation completed"
+}
 
-echo ""
-echo "🎉 Installation Summary"
-echo "======================"
-echo "Container ID: $CTID"
-echo "IP Address: $CONTAINER_IP"
-echo "Web Interface: https://$CONTAINER_IP"
-echo "Username: admin"
-echo "Password: moxnas1234"
-echo ""
-echo "SSH Access: ssh root@$CONTAINER_IP"
-echo "SSH Password: moxnas1234"
-echo ""
-echo "Network Shares:"
-echo "  SMB: //$CONTAINER_IP/moxnas-storage"
-echo "  NFS: $CONTAINER_IP:/mnt/storage"
-echo "  FTP: ftp://$CONTAINER_IP"
-echo ""
-msg_ok "MoxNAS is ready for use!"
+# Display final information
+show_completion() {
+    local container_ip
+    container_ip=$(pct exec $CTID -- hostname -I | awk '{print $1}')
+    
+    echo -e "\n${BOLD}🎉 MoxNAS Installation Completed Successfully!${CL}"
+    echo "================================================================"
+    echo -e "${BOLD}Container Details:${CL}"
+    echo "  Container ID: $CTID"
+    echo "  Hostname: $DEFAULT_HOSTNAME" 
+    echo "  IP Address: $container_ip"
+    echo "  CPU Cores: $var_cpu"
+    echo "  Memory: ${var_ram}MB"
+    echo "  Storage: ${var_disk}GB"
+    echo
+    echo -e "${BOLD}Access Information:${CL}"
+    echo "  Web Interface: https://$container_ip"
+    echo "  Username: admin"
+    echo "  Password: moxnas1234"
+    echo
+    echo -e "${BOLD}File Sharing:${CL}"
+    echo "  SMB/CIFS: //$container_ip/moxnas-storage"
+    echo "  NFS: $container_ip:/mnt/storage"
+    echo "  FTP: ftp://$container_ip"
+    echo
+    echo -e "${BOLD}Container Management:${CL}"
+    echo "  Start: pct start $CTID"
+    echo "  Stop: pct stop $CTID"
+    echo "  Console: pct enter $CTID"
+    echo "  Status: pct status $CTID"
+    echo
+    echo -e "${BOLD}Next Steps:${CL}"
+    echo "  1. Access the web interface and change the default password"
+    echo "  2. Configure storage pools and RAID arrays"
+    echo "  3. Set up network shares and user accounts"
+    echo "  4. Configure backup jobs and monitoring"
+    echo "  5. Replace SSL certificate for production use"
+    echo
+    echo -e "${YW}⚠️  Important Security Notes:${CL}"
+    echo "  - Change default passwords immediately"
+    echo "  - Configure firewall rules as needed"
+    echo "  - Set up proper SSL certificates"
+    echo "  - Review and adjust file sharing permissions"
+    echo
+    echo -e "${GN}✅ MoxNAS is ready for use!${CL}"
+}
+
+# Main execution
+main() {
+    # Show header
+    header_info
+    echo
+    
+    # Validate environment
+    check_proxmox
+    check_template
+    
+    # Create and configure container
+    create_container
+    start_container
+    install_moxnas
+    
+    # Show completion information
+    show_completion
+}
+
+# Run main function
+main "$@"
